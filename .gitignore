@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+medimind.db
+medimind.db-wal
+medimind.db-shm
+.pytest_cache/
+verification/screenshots/
+.DS_Store
+*.egg-info/
+dist/
+.mypy_cache/

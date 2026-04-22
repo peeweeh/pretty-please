@@ -1,0 +1,66 @@
+/* pretty-please — minimal CSS over Tailwind CDN */
+
+/* Buttons */
+.btn {
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.btn-inactive {
+  background: #334155;
+  color: #94a3b8;
+  border-color: #475569;
+}
+.btn-inactive:hover { background: #475569; color: #e2e8f0; }
+
+.btn-active-vibe {
+  background: #f97316;
+  color: white;
+  border-color: #ea580c;
+  box-shadow: 0 0 8px #f9731660;
+}
+.btn-active-fortress {
+  background: #16a34a;
+  color: white;
+  border-color: #15803d;
+  box-shadow: 0 0 8px #16a34a60;
+}
+.btn-active-neutral {
+  background: #2563eb;
+  color: white;
+  border-color: #1d4ed8;
+  box-shadow: 0 0 8px #2563eb60;
+}
+
+/* Audit entries */
+.audit-entry {
+  border-left-width: 4px;
+  margin-bottom: 0.5rem;
+  transition: border-color 0.2s;
+}
+
+/* Streaming indicator */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.streaming-dot {
+  display: inline-block;
+  animation: pulse-dot 1s ease-in-out infinite;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #1e293b; }
+::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* Cost counter pulse on update */
+@keyframes cost-flash {
+  0% { color: #facc15; }
+  100% { color: #e2e8f0; }
+}
