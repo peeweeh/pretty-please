@@ -38,7 +38,10 @@ function demoApp() {
     streaming: false,
     showCurlModal: false,
     showLogsModal: false,
+    showLogs: false,
+    logs: [],
     _auditSource: null,
+    _logSource: null,
 
     callers: {
       7:  {name: 'Alex Chen',    role: 'patient',   id: 'P7',  badge: 'bg-blue-900 text-blue-300',   desc: 'Standard patient — no admin privileges'},
@@ -49,6 +52,19 @@ function demoApp() {
 
     init() {
       this._connectAuditStream();
+      this._connectLogStream();
+    },
+
+    _connectLogStream() {
+      if (this._logSource) this._logSource.close();
+      const src = new EventSource('/api/logs');
+      src.onmessage = (ev) => {
+        const entry = JSON.parse(ev.data);
+        this.logs.unshift(entry);
+        if (this.logs.length > 100) this.logs.pop();
+      };
+      src.onerror = () => {};
+      this._logSource = src;
     },
 
     _connectAuditStream() {
@@ -222,6 +238,12 @@ function demoApp() {
     async resetDb() {
       await fetch('/api/reset', {method: 'POST'});
       this.resetChat();
+    },
+
+    logClass(entry) {
+      if (entry.msg.includes('BLOCKED')) return 'log-blocked';
+      if (entry.msg.includes('VIBE')) return 'log-vibe';
+      return 'log-allowed';
     },
   };
 }

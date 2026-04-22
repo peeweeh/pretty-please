@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import time
+from collections import deque
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -29,6 +30,29 @@ from .tools_vibe import TOOL_SCHEMAS as VIBE_SCHEMAS, call as vibe_call
 
 logger = logging.getLogger("uvicorn.error")
 
+# ── In-memory structured log buffer (for live log panel) ───────────────────
+_log_buffer: deque = deque(maxlen=200)
+_log_qs: list = []  # list of asyncio.Queue
+
+
+class _DemoLogHandler(logging.Handler):
+    """Captures FORTRESS/VIBE log entries into the buffer + live SSE queues."""
+    def emit(self, record: logging.LogRecord) -> None:
+        msg = record.getMessage()
+        if not ("[FORTRESS]" in msg or "[VIBE]" in msg):
+            return
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "msg": msg,
+        }
+        _log_buffer.append(entry)
+        for q in list(_log_qs):
+            try:
+                q.put_nowait(entry)
+            except Exception:
+                pass
+
 app = FastAPI(title="pretty-please — MediMind Health Demo")
 
 # ── Static files ────────────────────────────────────────────────────────────
@@ -41,6 +65,11 @@ def root():
     return FileResponse(os.path.join(_static_dir, "index.html"))
 
 
+@app.get("/how-it-works")
+def how_it_works():
+    return FileResponse(os.path.join(_static_dir, "how-it-works.html"))
+
+
 @app.get("/health")
 def health():
     return {"ok": True, "ts": datetime.now(timezone.utc).isoformat()}
@@ -51,6 +80,10 @@ def health():
 @app.on_event("startup")
 async def startup():
     init_and_seed()
+    # Register the demo log handler on the root logger
+    _handler = _DemoLogHandler()
+    logging.getLogger().addHandler(_handler)
+    logging.getLogger("uvicorn.error").addHandler(_handler)
     logger.info("DB seeded. Starting reset loop.")
     interval = int(os.environ.get("DB_RESET_INTERVAL", "300"))
     asyncio.create_task(_reset_loop(interval))
@@ -105,18 +138,26 @@ async def api_chat(req: ChatRequest):
         def dispatch(tool_name: str, args: dict):
             thinking = _ctx.pop("thinking", "")
             start = time.perf_counter()
+            caller_label = f"{caller['name']} (P{caller['id']}, {caller['role']})"
             try:
                 result = fortress_call(tool_name, args, caller_id=req.caller_id)
                 duration_ms = (time.perf_counter() - start) * 1000
+                logger.info(
+                    f"[FORTRESS] ✅ ALLOWED  tool={tool_name}  caller={caller_label}  args={json.dumps(args)}"
+                )
                 write_and_broadcast(req.session_id, req.caller_id, tool_name, args,
                                     allowed=True, reason="ok", duration_ms=duration_ms,
-                                    thinking=thinking)
+                                    thinking=thinking, result=result)
                 return result
             except AuthzError as e:
                 duration_ms = (time.perf_counter() - start) * 1000
+                logger.warning(
+                    f"[FORTRESS] 🚫 BLOCKED  tool={tool_name}  caller={caller_label}  reason={e}"
+                )
+                blocked_result = {"error": str(e), "enforcement": "engine"}
                 write_and_broadcast(req.session_id, req.caller_id, tool_name, args,
                                     allowed=False, reason=str(e), duration_ms=duration_ms,
-                                    thinking=thinking)
+                                    thinking=thinking, result=blocked_result)
                 return {"error": str(e)}
 
     else:  # vibe
@@ -126,13 +167,16 @@ async def api_chat(req: ChatRequest):
         def dispatch(tool_name: str, args: dict):
             thinking = _ctx.pop("thinking", "")
             start = time.perf_counter()
+            caller_label = f"{caller['name']} (P{caller['id']}, {caller['role']})"
             result = vibe_call(tool_name, args, caller_id=req.caller_id)
             duration_ms = (time.perf_counter() - start) * 1000
             # Vibe: log PII in plaintext — that's the point
-            logger.info(f"[VIBE] tool={tool_name} args={json.dumps(args)} result={json.dumps(result)}")
+            logger.warning(
+                f"[VIBE] ⚠️  LEAK  tool={tool_name}  caller={caller_label}  args={json.dumps(args)}  result={json.dumps(result)[:200]}"
+            )
             write_and_broadcast(req.session_id, req.caller_id, tool_name, args,
                                 allowed=True, reason="no authZ check", duration_ms=duration_ms,
-                                thinking=thinking)
+                                thinking=thinking, result=result)
             return result
 
     def emit_audit(tool_name, args, result, allowed, reason, duration_ms, thinking=""):
@@ -186,6 +230,62 @@ class ToolCallRequest(BaseModel):
     body: str | None = None
     user_id: int | None = None
     new_password: str | None = None
+
+
+# ── Live server log SSE stream ──────────────────────────────────────────────
+
+@app.get("/api/logs")
+async def log_stream(request: Request):
+    q: asyncio.Queue = asyncio.Queue(maxsize=500)
+    _log_qs.append(q)
+
+    async def gen():
+        try:
+            # Replay recent buffer first
+            for entry in list(_log_buffer)[-50:]:
+                yield f"data: {json.dumps(entry)}\n\n"
+            # Then stream live
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    entry = q.get_nowait()
+                    yield f"data: {json.dumps(entry)}\n\n"
+                except asyncio.QueueEmpty:
+                    await asyncio.sleep(0.15)
+        finally:
+            try:
+                _log_qs.remove(q)
+            except ValueError:
+                pass
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+# ── Engine enforcement demo — bypasses the LLM entirely ─────────────────────
+
+class DemoEnforceRequest(BaseModel):
+    tool: str = "admin_reset_password"
+    args: dict = {"user_id": 5, "new_password": "hacked"}
+    caller_id: int = 7  # default: patient Alex Chen
+
+
+@app.post("/api/demo-enforce")
+async def demo_enforce(req: DemoEnforceRequest):
+    """
+    Prove engine enforcement works even without the LLM.
+    Calls the Fortress tool layer directly — no model, no system prompt.
+    """
+    with conn() as c:
+        row = c.execute("SELECT * FROM patients WHERE id=?", (req.caller_id,)).fetchone()
+    caller_label = f"{row['name']} (P{req.caller_id}, {row['role']})" if row else f"P{req.caller_id}"
+    try:
+        result = fortress_call(req.tool, req.args, caller_id=req.caller_id)
+        logger.info(f"[FORTRESS] ✅ ALLOWED  tool={req.tool}  caller={caller_label}  (demo-enforce)")
+        return {"allowed": True, "result": result, "enforcement_layer": "engine", "caller": caller_label}
+    except AuthzError as e:
+        logger.warning(f"[FORTRESS] 🚫 BLOCKED  tool={req.tool}  caller={caller_label}  reason={e}  (demo-enforce, no LLM)")
+        return {"allowed": False, "error": str(e), "enforcement_layer": "engine", "caller": caller_label}
 
 
 @app.post("/mcp-vibe/{tool_name}")

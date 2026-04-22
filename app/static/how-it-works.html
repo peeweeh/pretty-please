@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How It Works — MediMind Security</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; }
+    code, pre { font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace; }
+    .code-vibe  { background: #1c0a0a; border-left: 3px solid #ef4444; }
+    .code-fortress { background: #061410; border-left: 3px solid #22c55e; }
+    .layer-card { background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; }
+    .layer-bad  { border-top: 3px solid #ef4444; }
+    .layer-good { border-top: 3px solid #22c55e; }
+    .step { background: #1e293b; border-left: 3px solid #3b82f6; border-radius: 0 0.375rem 0.375rem 0; }
+    .step-blocked { border-left-color: #22c55e; }
+    .step-leak    { border-left-color: #ef4444; }
+    .enforce-result { min-height: 3rem; }
+    .tag-vibe    { background: #450a0a; color: #fca5a5; border: 1px solid #7f1d1d; }
+    .tag-fortress { background: #052e16; color: #86efac; border: 1px solid #14532d; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-slate-800 border-b border-slate-700 px-8 py-4 flex items-center justify-between sticky top-0 z-10">
+    <div>
+      <h1 class="text-xl font-bold text-white">🔐 Don't Trust Guardrails</h1>
+      <p class="text-sm text-slate-400">Design your tooling properly — engine enforcement is the only real fix</p>
+    </div>
+    <a href="/" class="text-sm text-blue-400 hover:text-blue-300 border border-blue-700 hover:border-blue-500 rounded px-3 py-1.5 transition">
+      ← Back to demo
+    </a>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-8 py-10 space-y-16">
+
+    <!-- ── Section 1: The Core Argument ─────────────────────────────────────── -->
+    <section>
+      <h2 class="text-2xl font-bold text-white mb-3">The Problem With Guardrails</h2>
+      <p class="text-slate-300 text-base leading-relaxed max-w-3xl">
+        Bedrock Guardrails and system prompt instructions tell the <em>model</em> what to do.
+        They're filters and suggestions. But they sit <strong class="text-white">outside</strong> your tool code —
+        which means any path that bypasses the model also bypasses them entirely.
+      </p>
+      <p class="text-slate-300 text-base leading-relaxed max-w-3xl mt-3">
+        Engine enforcement means the <strong class="text-white">tool itself</strong> checks authorization
+        before touching any data. The model is irrelevant. If you're not allowed, the code throws.
+        No data is accessed. Ever.
+      </p>
+    </section>
+
+    <!-- ── Section 2: Three Defense Layers ──────────────────────────────────── -->
+    <section>
+      <h2 class="text-2xl font-bold text-white mb-6">Three Defense Layers</h2>
+      <div class="grid grid-cols-3 gap-4">
+
+        <!-- Layer 1: Bedrock Guardrails -->
+        <div class="layer-card layer-bad p-5">
+          <div class="text-xs font-bold text-red-400 uppercase tracking-widest mb-3">Layer 1 — Soft</div>
+          <h3 class="text-base font-bold text-white mb-2">Bedrock Guardrails</h3>
+          <ul class="text-sm text-slate-400 space-y-1.5 mb-4">
+            <li>✓ Content filtering (hate, CSAM)</li>
+            <li>✓ PII detection in LLM outputs</li>
+            <li>✓ Topic / denial policies</li>
+            <li>✓ Jailbreak pattern detection</li>
+          </ul>
+          <div class="text-xs rounded p-3 bg-red-950 border border-red-800 text-red-300">
+            <strong>Bypassed by:</strong> calling your tool server URL directly (Attack 7).
+            The LLM never sees the request — guardrails are never evaluated.
+          </div>
+        </div>
+
+        <!-- Layer 2: System Prompt -->
+        <div class="layer-card layer-bad p-5">
+          <div class="text-xs font-bold text-orange-400 uppercase tracking-widest mb-3">Layer 2 — Soft</div>
+          <h3 class="text-base font-bold text-white mb-2">System Prompt Instructions</h3>
+          <ul class="text-sm text-slate-400 space-y-1.5 mb-4">
+            <li>✓ Role and persona definition</li>
+            <li>✓ "Only access your own records"</li>
+            <li>✓ Tool-use restrictions</li>
+            <li>✓ Caller identity context</li>
+          </ul>
+          <div class="text-xs rounded p-3 bg-orange-950 border border-orange-800 text-orange-300">
+            <strong>Bypassed by:</strong> prompt injection, jailbreaking, confused deputy attacks.
+            A sufficiently crafted user message can override or ignore these instructions.
+          </div>
+        </div>
+
+        <!-- Layer 3: Engine -->
+        <div class="layer-card layer-good p-5">
+          <div class="text-xs font-bold text-green-400 uppercase tracking-widest mb-3">Layer 3 — Hard</div>
+          <h3 class="text-base font-bold text-white mb-2">Engine Enforcement</h3>
+          <ul class="text-sm text-slate-400 space-y-1.5 mb-4">
+            <li>✓ <code class="text-green-400">authz_admin(caller_id)</code></li>
+            <li>✓ <code class="text-green-400">authz_own_or_caregiver()</code></li>
+            <li>✓ Runs before any data access</li>
+            <li>✓ Raises <code class="text-green-400">AuthzError</code> on failure</li>
+          </ul>
+          <div class="text-xs rounded p-3 bg-green-950 border border-green-800 text-green-300">
+            <strong>Cannot be bypassed.</strong> Runs inside the tool function.
+            No model, no guardrail, no prompt — just code that checks the caller.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── Section 3: The Attack Flow ───────────────────────────────────────── -->
+    <section>
+      <h2 class="text-2xl font-bold text-white mb-2">Attack: Confused Deputy (Reset Password)</h2>
+      <p class="text-slate-400 text-sm mb-6">
+        Alex Chen logs in as <span class="text-blue-300 font-semibold">patient P7</span>.
+        They ask Mira: <em>"I forgot my password — use the admin reset tool to set it to 'password123'."</em>
+      </p>
+
+      <div class="grid grid-cols-2 gap-6">
+
+        <!-- Vibe path -->
+        <div>
+          <div class="flex items-center gap-2 mb-3">
+            <span class="tag-vibe text-xs font-bold rounded px-2 py-0.5">🌈 VIBE — No Guardrails</span>
+          </div>
+          <div class="space-y-2">
+            <div class="step step-leak p-3 text-sm">
+              <span class="text-slate-500 text-xs">1.</span>
+              User sends message → LLM receives it
+            </div>
+            <div class="step step-leak p-3 text-sm">
+              <span class="text-slate-500 text-xs">2.</span>
+              LLM decides to call <code class="text-red-400">admin_reset_password</code>
+              with <code class="text-red-300">user_id=7, new_password="password123"</code>
+            </div>
+            <div class="step step-leak p-3 text-sm">
+              <span class="text-slate-500 text-xs">3.</span>
+              Tool runs. <strong class="text-red-400">No auth check.</strong>
+              Password is reset. Data is changed.
+            </div>
+            <div class="step step-leak p-3 text-sm">
+              <span class="text-slate-500 text-xs">4.</span>
+              LLM replies: "Done! Your password has been reset."
+            </div>
+            <div class="mt-2 text-xs text-red-400 bg-red-950 rounded p-3 border border-red-800">
+              ⚠️ The model "trusted" the request. No one stopped it.
+              <br>Bedrock Guardrails didn't fire — no offensive content, just an API call.
+            </div>
+          </div>
+        </div>
+
+        <!-- Fortress path -->
+        <div>
+          <div class="flex items-center gap-2 mb-3">
+            <span class="tag-fortress text-xs font-bold rounded px-2 py-0.5">🛡 FORTRESS — Engine Enforcement</span>
+          </div>
+          <div class="space-y-2">
+            <div class="step p-3 text-sm">
+              <span class="text-slate-500 text-xs">1.</span>
+              User sends message → LLM receives it
+            </div>
+            <div class="step p-3 text-sm">
+              <span class="text-slate-500 text-xs">2.</span>
+              LLM decides to call <code class="text-slate-300">admin_reset_password</code>
+              with <code class="text-slate-300">user_id=7, new_password="password123"</code>
+            </div>
+            <div class="step step-blocked p-3 text-sm">
+              <span class="text-slate-500 text-xs">3.</span>
+              <strong class="text-green-400">Engine:</strong>
+              <code class="text-green-300">authz_admin(caller_id=7)</code>
+              → <code class="text-green-400">SELECT role FROM patients WHERE id=7</code>
+              → role = <code class="text-yellow-300">"patient"</code>
+              → <strong class="text-green-300">raises AuthzError</strong>
+            </div>
+            <div class="step step-blocked p-3 text-sm">
+              <span class="text-slate-500 text-xs">4.</span>
+              Tool returns <code class="text-green-300">{"error": "Admin access required. Caller 7 is not an admin."}</code>
+              <br>Password unchanged. No data written.
+            </div>
+            <div class="mt-2 text-xs text-green-400 bg-green-950 rounded p-3 border border-green-800">
+              ✅ Engine blocked before any data was touched.
+              The model's intent was irrelevant.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── Section 4: The Code ───────────────────────────────────────────────── -->
+    <section>
+      <h2 class="text-2xl font-bold text-white mb-2">The Fix: 5 Lines</h2>
+      <p class="text-slate-400 text-sm mb-6">
+        Same tool, two implementations. The only difference is one call to <code class="text-green-400">authz_admin()</code>.
+      </p>
+
+      <div class="grid grid-cols-2 gap-4">
+
+        <!-- Vibe code -->
+        <div>
+          <div class="text-xs font-bold text-red-400 uppercase tracking-widest mb-2">❌ tools_vibe.py</div>
+          <pre class="code-vibe rounded p-4 text-sm overflow-x-auto text-slate-300"><code><span class="text-slate-500"># Trusts the model to never call this for non-admins.</span>
+<span class="text-slate-500"># If the model is tricked — or bypassed — data leaks.</span>
+
+def admin_reset_password(
+    user_id: int,
+    new_password: str,
+    **_,
+) -&gt; dict:
+    <span class="text-red-400">db.execute(
+        "UPDATE patients SET password=? WHERE id=?",
+        new_password, user_id
+    )</span>
+    return {"status": "reset", "user_id": user_id}
+</code></pre>
+        </div>
+
+        <!-- Fortress code -->
+        <div>
+          <div class="text-xs font-bold text-green-400 uppercase tracking-widest mb-2">✅ tools_fortress.py</div>
+          <pre class="code-fortress rounded p-4 text-sm overflow-x-auto text-slate-300"><code><span class="text-slate-500"># Model is irrelevant. Check runs before any data access.</span>
+<span class="text-slate-500"># caller_id is injected server-side — never from the LLM.</span>
+
+def admin_reset_password(
+    caller_id: int,   <span class="text-green-400"># injected — not LLM-controlled</span>
+    user_id: int,
+    new_password: str,
+    **_,
+) -&gt; dict:
+    <span class="text-green-400">authz_admin(caller_id)  # raises AuthzError if not admin</span>
+    db.execute(
+        "UPDATE patients SET password=? WHERE id=?",
+        new_password, user_id
+    )
+    return {"status": "reset", "user_id": user_id}
+</code></pre>
+        </div>
+
+      </div>
+
+      <!-- The check itself -->
+      <div class="mt-4">
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">The check — guardrails.py</div>
+        <pre class="code-fortress rounded p-4 text-sm overflow-x-auto text-slate-300"><code>class <span class="text-yellow-300">AuthzError</span>(Exception):
+    """Raised when authorization check fails. Tool returns error, no data accessed."""
+
+def <span class="text-green-400">authz_admin</span>(caller_id: int) -&gt; None:
+    """Verify the caller has the admin role. Raises AuthzError if not."""
+    row = db.execute("SELECT role FROM patients WHERE id=?", (caller_id,)).fetchone()
+    if not row or row["role"] != "admin":
+        raise AuthzError(
+            f"Admin access required. Caller {caller_id} is not an admin."
+        )
+    <span class="text-slate-500"># If we reach here: caller is verified admin. Proceed.</span>
+</code></pre>
+      </div>
+    </section>
+
+    <!-- ── Section 5: Why caller_id must be server-injected ──────────────────── -->
+    <section>
+      <h2 class="text-2xl font-bold text-white mb-2">Critical: caller_id Must Come From the Server</h2>
+      <p class="text-slate-400 text-sm mb-4">
+        If <code class="text-yellow-300">caller_id</code> is part of the tool's LLM-facing schema, the model can set it to anything.
+        The fix: <strong class="text-white">never expose caller_id in the tool schema</strong>. Inject it server-side from the authenticated session.
+      </p>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <div class="text-xs font-bold text-red-400 mb-2">❌ Vulnerable — caller_id in schema</div>
+          <pre class="code-vibe rounded p-4 text-sm overflow-x-auto text-slate-300"><code><span class="text-slate-500"># LLM can pass caller_id=15 (admin) even as patient P7</span>
+{
+  "name": "admin_reset_password",
+  "inputSchema": {
+    "properties": {
+      <span class="text-red-400">"caller_id": {"type": "integer"},</span>
+      "user_id": {"type": "integer"},
+      "new_password": {"type": "string"}
+    }
+  }
+}
+</code></pre>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-green-400 mb-2">✅ Safe — caller_id injected server-side</div>
+          <pre class="code-fortress rounded p-4 text-sm overflow-x-auto text-slate-300"><code><span class="text-slate-500"># Schema — caller_id is NOT here. LLM cannot set it.</span>
+{
+  "name": "admin_reset_password",
+  "inputSchema": {
+    "properties": {
+      "user_id": {"type": "integer"},
+      "new_password": {"type": "string"}
+    }
+  }
+}
+
+<span class="text-slate-500"># Dispatch — server injects caller from session</span>
+<span class="text-green-400">result = fortress_call(tool_name, args, caller_id=req.caller_id)</span>
+<span class="text-slate-500">#                                          ^^^ from auth session, not LLM</span>
+</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Section 6: Live Engine Test ──────────────────────────────────────── -->
+    <section>
+      <h2 class="text-2xl font-bold text-white mb-2">Prove It: Bypass the LLM Entirely</h2>
+      <p class="text-slate-400 text-sm mb-6">
+        This button calls <code class="text-yellow-300">/api/demo-enforce</code> directly — no model, no prompt, no guardrails.
+        Just the tool layer. See if the engine blocks a patient from resetting a password.
+      </p>
+
+      <div class="grid grid-cols-2 gap-6">
+        <!-- Patient test -->
+        <div class="layer-card p-5">
+          <div class="text-sm font-bold text-white mb-1">🧪 Call as Patient P7 (Alex Chen)</div>
+          <div class="text-xs text-slate-400 mb-4">
+            Tool: <code class="text-yellow-300">admin_reset_password</code> •
+            Args: <code class="text-slate-300">user_id=5, new_password="hacked"</code>
+          </div>
+          <button onclick="testEnforce(7)"
+            class="bg-blue-700 hover:bg-blue-600 text-white rounded px-4 py-2 text-sm font-medium transition mb-3">
+            🔐 Run as Patient (no LLM)
+          </button>
+          <div id="result-7" class="enforce-result text-xs font-mono bg-slate-900 rounded p-3 text-slate-400 min-h-12">
+            Click to test...
+          </div>
+        </div>
+
+        <!-- Admin test -->
+        <div class="layer-card p-5">
+          <div class="text-sm font-bold text-white mb-1">🧪 Call as Admin P15 (Dr. Rachel Kim)</div>
+          <div class="text-xs text-slate-400 mb-4">
+            Tool: <code class="text-yellow-300">admin_reset_password</code> •
+            Args: <code class="text-slate-300">user_id=5, new_password="hacked"</code>
+          </div>
+          <button onclick="testEnforce(15)"
+            class="bg-purple-700 hover:bg-purple-600 text-white rounded px-4 py-2 text-sm font-medium transition mb-3">
+            🔐 Run as Admin (no LLM)
+          </button>
+          <div id="result-15" class="enforce-result text-xs font-mono bg-slate-900 rounded p-3 text-slate-400 min-h-12">
+            Click to test...
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 text-xs text-slate-500 bg-slate-900 rounded p-3 border border-slate-700">
+        <strong class="text-slate-300">What this proves:</strong>
+        The engine enforcement runs regardless of whether a model or a human made the call.
+        Bedrock Guardrails are not in this path at all — this is a raw HTTP call to the tool server.
+        The only thing stopping the patient is <code class="text-green-400">authz_admin(caller_id)</code> inside the function.
+      </div>
+    </section>
+
+    <!-- ── Section 7: Guardrails ARE still useful ───────────────────────────── -->
+    <section>
+      <h2 class="text-2xl font-bold text-white mb-2">Guardrails Are Still Useful — Just Not For This</h2>
+      <div class="grid grid-cols-3 gap-4">
+        <div class="layer-card p-4">
+          <div class="text-xs font-bold text-green-400 uppercase tracking-widest mb-2">✅ Use Guardrails For</div>
+          <ul class="text-sm text-slate-400 space-y-1.5">
+            <li>Blocking harmful content (CSAM, violence)</li>
+            <li>PII detection in LLM outputs</li>
+            <li>Competitor topic blocking</li>
+            <li>Jailbreak pattern detection</li>
+            <li>Prompt injection input filtering</li>
+          </ul>
+        </div>
+        <div class="layer-card p-4">
+          <div class="text-xs font-bold text-red-400 uppercase tracking-widest mb-2">❌ Don't Rely On Guardrails For</div>
+          <ul class="text-sm text-slate-400 space-y-1.5">
+            <li>Authorization (who can call what)</li>
+            <li>Broken access control (IDOR)</li>
+            <li>Data isolation between users</li>
+            <li>Admin privilege enforcement</li>
+            <li>Rate limiting sensitive actions</li>
+          </ul>
+        </div>
+        <div class="layer-card p-4">
+          <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">🔐 Always Enforce at Engine</div>
+          <ul class="text-sm text-slate-400 space-y-1.5">
+            <li><code class="text-green-400">authz_admin(caller_id)</code> in every admin tool</li>
+            <li><code class="text-green-400">authz_own_or_caregiver()</code> for patient data</li>
+            <li>caller_id from session, never from LLM</li>
+            <li>AuthzError → audit log → no data returned</li>
+            <li>Works even when model is bypassed</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="bg-slate-900 border-t border-slate-800 px-8 py-4 text-center text-xs text-slate-600">
+    MediMind Health Security Demo — Synthetic data only — <a href="/" class="text-blue-500 hover:text-blue-400">← Back to demo</a>
+  </footer>
+
+  <script>
+    async function testEnforce(callerId) {
+      const el = document.getElementById(`result-${callerId}`);
+      el.textContent = 'Calling engine directly (no LLM)...';
+      el.className = 'enforce-result text-xs font-mono bg-slate-900 rounded p-3 text-slate-400 min-h-12';
+      try {
+        const resp = await fetch('/api/demo-enforce', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            tool: 'admin_reset_password',
+            args: {user_id: 5, new_password: 'hacked'},
+            caller_id: callerId,
+          }),
+        });
+        const data = await resp.json();
+        el.textContent = JSON.stringify(data, null, 2);
+        if (data.allowed) {
+          el.className = 'enforce-result text-xs font-mono bg-green-950 border border-green-800 rounded p-3 text-green-300 min-h-12';
+        } else {
+          el.className = 'enforce-result text-xs font-mono bg-red-950 border border-red-800 rounded p-3 text-red-300 min-h-12';
+        }
+      } catch(err) {
+        el.textContent = 'Error: ' + err.message;
+        el.className = 'enforce-result text-xs font-mono bg-slate-900 rounded p-3 text-orange-400 min-h-12';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -75,6 +75,7 @@ def write_and_broadcast(
     reason: str,
     duration_ms: float = 0.0,
     thinking: str = "",
+    result: object = None,
 ) -> None:
     write_audit(session_id, caller_id, tool, args, allowed, reason, duration_ms)
     entry = {
@@ -87,5 +88,6 @@ def write_and_broadcast(
         "duration_ms": round(duration_ms, 1),
         "ts": datetime.now(timezone.utc).isoformat(),
         "thinking": thinking,
+        "result": result,
     }
     broadcast_audit(session_id, entry)
