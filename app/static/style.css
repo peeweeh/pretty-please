@@ -1,7 +1,172 @@
 /* pretty-please — minimal CSS over Tailwind CDN */
+/* ── Spectra palette ───────────────────────────────────────────────────────
+   F9F9F9 alabaster  807778 empress  8D9995 mantle  6C6472 salt-box  345356 spectra
+   ── Override Tailwind slate with palette-derived teal-grey darks ───────── */
+
+body { background-color: #172526 !important; color: #d4dbd8 !important; }
+
+.bg-slate-900 { background-color: #172526 !important; }
+.bg-slate-800 { background-color: #1f3436 !important; }
+.bg-slate-700 { background-color: #2a4547 !important; }
+.bg-slate-600 { background-color: #375a5c !important; }
+
+.border-slate-700 { border-color: #2e4f51 !important; }
+.border-slate-600 { border-color: #3a6163 !important; }
+
+.text-slate-100 { color: #eaf0ee !important; }
+.text-slate-200 { color: #d4dbd8 !important; }
+.text-slate-300 { color: #b5c4c0 !important; }
+.text-slate-400 { color: #8D9995 !important; }
+.text-slate-500 { color: #6a8480 !important; }
+
+/* Inputs */
+input.bg-slate-700, select.bg-slate-700 { background-color: #2a4547 !important; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #172526; }
+::-webkit-scrollbar-thumb { background: #375a5c; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4a7274; }
 
 /* Buttons */
 .btn {
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.btn-inactive {
+  background: #2a4547;
+  color: #8D9995;
+  border-color: #375a5c;
+}
+.btn-inactive:hover { background: #375a5c; color: #d4dbd8; }
+
+.btn-active-vibe {
+  background: #f97316;
+  color: white;
+  border-color: #ea580c;
+  box-shadow: 0 0 8px #f9731660;
+}
+.btn-active-fortress {
+  background: #16a34a;
+  color: white;
+  border-color: #15803d;
+  box-shadow: 0 0 8px #16a34a60;
+}
+.btn-active-guardrails {
+  background: #d97706;
+  color: white;
+  border-color: #b45309;
+  box-shadow: 0 0 8px #d9770660;
+}
+.btn-active-neutral {
+  background: #345356;
+  color: #eaf0ee;
+  border-color: #2a4345;
+  box-shadow: 0 0 8px #34535660;
+}
+
+/* Audit entries */
+.audit-entry {
+  border-left-width: 4px;
+  margin-bottom: 0.5rem;
+  transition: border-color 0.2s;
+}
+
+/* Streaming indicator */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.streaming-dot {
+  display: inline-block;
+  animation: pulse-dot 1s ease-in-out infinite;
+}
+
+/* Cost counter pulse on update */
+@keyframes cost-flash {
+  0% { color: #facc15; }
+  100% { color: #d4dbd8; }
+}
+
+/* Log stream */
+.log-blocked    { background: rgba(239,68,68,0.08);  color: #fca5a5; border-left: 2px solid #ef4444; }
+.log-vibe       { background: rgba(249,115,22,0.07); color: #fdba74; border-left: 2px solid #f97316; }
+.log-guardrails { background: rgba(217,119,6,0.08);  color: #fde68a; border-left: 2px solid #d97706; }
+.log-allowed    { background: rgba(52,83,86,0.3);    color: #8D9995; border-left: 2px solid #345356; }
+
+/* ── Markdown content rendered in chat bubbles ──────────────────────────── */
+.md-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
+}
+.md-content th,
+.md-content td {
+  border: 1px solid #2e4f51;
+  padding: 0.2rem 0.5rem;
+  text-align: left;
+}
+.md-content th { background: #172526; font-weight: 600; color: #8D9995; }
+.md-content tr:hover td { background: rgba(23,37,38,0.5); }
+.md-content strong { color: #eaf0ee; font-weight: 700; }
+.md-content em { color: #b5c4c0; }
+.md-content code {
+  background: #172526;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.85em;
+  color: #8D9995;
+}
+.md-content p { margin: 0.3rem 0; }
+.md-content p:first-child { margin-top: 0; }
+.md-content p:last-child { margin-bottom: 0; }
+.md-content ul,
+.md-content ol { margin: 0.25rem 0; padding-left: 1.25rem; }
+.md-content li { margin: 0.1rem 0; }
+.md-content h1, .md-content h2, .md-content h3 {
+  color: #d4dbd8; font-weight: 700; margin: 0.5rem 0 0.25rem;
+}
+
+/* ── Thinking block (collapsible in chat bubble) ────────────────────────── */
+.thinking-block {
+  background: #172526;
+  border: 1px solid #2e4f51;
+  border-left: 3px solid #6C6472;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+.thinking-block summary {
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  color: #8D9995;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  user-select: none;
+  list-style: none;
+}
+.thinking-block summary::-webkit-details-marker { display: none; }
+.thinking-block summary:hover { color: #b5c4c0; }
+.thinking-tag { font-weight: 400; opacity: 0.6; }
+.thinking-content {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.72rem;
+  color: #8D9995;
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow-y: auto;
+  border-top: 1px solid #2e4f51;
+}
+
+/* ── Audit entry — clickable, hover highlight ───────────────────────────── */
+.audit-entry { cursor: pointer; }
+
   padding: 0.25rem 0.75rem;
   border-radius: 0.375rem;
   font-size: 0.875rem;
@@ -28,6 +193,12 @@
   color: white;
   border-color: #15803d;
   box-shadow: 0 0 8px #16a34a60;
+}
+.btn-active-guardrails {
+  background: #d97706;
+  color: white;
+  border-color: #b45309;
+  box-shadow: 0 0 8px #d9770660;
 }
 .btn-active-neutral {
   background: #2563eb;
@@ -138,4 +309,5 @@
 .log-line { white-space: pre-wrap; word-break: break-all; }
 .log-blocked { background: rgba(239,68,68,0.08); color: #fca5a5; border-left: 2px solid #ef4444; }
 .log-vibe    { background: rgba(249,115,22,0.07); color: #fdba74; border-left: 2px solid #f97316; }
+.log-guardrails { background: rgba(217,119,6,0.08); color: #fde68a; border-left: 2px solid #d97706; }
 .log-allowed { background: rgba(34,197,94,0.06);  color: #86efac; border-left: 2px solid #22c55e; }

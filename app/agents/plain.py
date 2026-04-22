@@ -2,8 +2,8 @@
 Plain Bedrock Converse tool-use loop with extended thinking support.
 Raw boto3 — no SDK abstractions. Readable on a slide.
 """
+
 import os
-import time
 from collections.abc import AsyncGenerator
 from typing import Any, Callable
 
@@ -79,7 +79,8 @@ async def run(
       {"type": "done"}
     """
     model_id = os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
-    local_messages = list(messages)
+    # Mutate the passed-in list directly so the caller accumulates conversation history.
+    local_messages = messages
 
     while True:
         resp = _converse(
@@ -124,16 +125,21 @@ async def run(
                 tool_args = tu.get("input", {})
 
                 # Store thinking in shared _ctx so dispatch includes it in the audit entry
-                emit_audit(tool_name, tool_args, None, True, "pre", 0,
-                           thinking_text if first_tool else "")
+                emit_audit(
+                    tool_name, tool_args, None, True, "pre", 0, thinking_text if first_tool else ""
+                )
                 first_tool = False
 
                 result = dispatch_fn(tool_name, tool_args)
-                tool_results.append({
-                    "toolResult": {
-                        "toolUseId": tu["toolUseId"],
-                        "content": [{"json": result if isinstance(result, dict) else {"result": result}}],
+                tool_results.append(
+                    {
+                        "toolResult": {
+                            "toolUseId": tu["toolUseId"],
+                            "content": [
+                                {"json": result if isinstance(result, dict) else {"result": result}}
+                            ],
+                        }
                     }
-                })
+                )
 
         local_messages.append({"role": "user", "content": tool_results})

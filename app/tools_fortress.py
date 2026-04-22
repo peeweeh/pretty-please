@@ -2,10 +2,10 @@
 tools_fortress.py — The GOOD tools. Authorization enforced.
 Same tool names as tools_vibe.py. The diff is the demo.
 """
+
 from .db import conn
 from .guardrails import (
     AuthzError,
-    EMAIL_ALLOWLIST,
     authz_admin,
     authz_own_or_caregiver,
     validate_email_domain,
@@ -114,6 +114,7 @@ ADMIN_TOOLS = [s["toolSpec"]["name"] for s in ADMIN_TOOL_SCHEMAS]
 
 # ── Tool implementations — authZ enforced ──────────────────────────────────
 
+
 def get_my_labs(caller_id: int, **_) -> list[dict]:
     """Own labs only. caller_id injected server-side."""
     with conn() as c:
@@ -139,17 +140,30 @@ def get_patient_labs(caller_id: int, patient_id: int, **_) -> list[dict]:
 
 
 def get_my_notes(caller_id: int, **_) -> list[dict]:
-    """Notes wrapped in untrusted tags — blocks prompt injection."""
+    """Returns only patient-visible notes for patients. Doctors/admins see all."""
+    # Get caller role
     with conn() as c:
-        rows = c.execute(
-            "SELECT author, content, created_at FROM notes WHERE patient_id=? ORDER BY created_at DESC",
-            (caller_id,),
-        ).fetchall()
+        caller = c.execute("SELECT role FROM patients WHERE id=?", (caller_id,)).fetchone()
+    caller_role = caller["role"] if caller else "patient"
+
+    with conn() as c:
+        if caller_role in ("admin", "doctor"):
+            rows = c.execute(
+                "SELECT author, content, created_at FROM notes WHERE patient_id=? ORDER BY created_at DESC",
+                (caller_id,),
+            ).fetchall()
+        else:
+            # Engine enforces: patients never see doctor_only notes
+            rows = c.execute(
+                "SELECT author, content, created_at FROM notes WHERE patient_id=? AND doctor_only=0 ORDER BY created_at DESC",
+                (caller_id,),
+            ).fetchall()
     return [
         {
             "author": r["author"],
             "content": wrap_untrusted(r["content"]),
             "created_at": r["created_at"],
+            "visibility": "👥 Patient & Doctor",
         }
         for r in rows
     ]

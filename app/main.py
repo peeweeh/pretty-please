@@ -2,6 +2,7 @@
 FastAPI app — routes, SSE, startup seed, 5-min reset loop.
 All routes in one file because the total is ~200 lines. Demo clarity > structure.
 """
+
 import asyncio
 import json
 import logging
@@ -15,18 +16,20 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from . import log_store
 from .agents import get_translator
 from .audit import (
-    broadcast_audit,
     register_audit_queue,
     unregister_audit_queue,
     write_and_broadcast,
 )
 from .db import conn, init_and_seed
 from .guardrails import AuthzError
-from .prompts import VIBE_SYSTEM, get_fortress_prompt
-from .tools_fortress import call as fortress_call, get_schemas_for_caller
-from .tools_vibe import TOOL_SCHEMAS as VIBE_SCHEMAS, call as vibe_call
+from .prompts import VIBE_SYSTEM, get_fortress_prompt, get_guardrails_prompt
+from .tools_fortress import call as fortress_call
+from .tools_fortress import get_schemas_for_caller
+from .tools_vibe import TOOL_SCHEMAS as VIBE_SCHEMAS
+from .tools_vibe import call as vibe_call
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -36,10 +39,11 @@ _log_qs: list = []  # list of asyncio.Queue
 
 
 class _DemoLogHandler(logging.Handler):
-    """Captures FORTRESS/VIBE log entries into the buffer + live SSE queues."""
+    """Captures FORTRESS/VIBE/GUARDRAILS log entries into the buffer + live SSE queues."""
+
     def emit(self, record: logging.LogRecord) -> None:
         msg = record.getMessage()
-        if not ("[FORTRESS]" in msg or "[VIBE]" in msg):
+        if not ("[FORTRESS]" in msg or "[VIBE]" in msg or "[GUARDRAILS]" in msg):
             return
         entry = {
             "ts": datetime.now(timezone.utc).isoformat(),
@@ -47,11 +51,14 @@ class _DemoLogHandler(logging.Handler):
             "msg": msg,
         }
         _log_buffer.append(entry)
+        log_store.append(msg)  # also feed the tool-readable store
+        _log_buffer.append(entry)
         for q in list(_log_qs):
             try:
                 q.put_nowait(entry)
             except Exception:
                 pass
+
 
 app = FastAPI(title="pretty-please — MediMind Health Demo")
 
@@ -77,6 +84,7 @@ def health():
 
 # ── Startup / reset loop ────────────────────────────────────────────────────
 
+
 @app.on_event("startup")
 async def startup():
     init_and_seed()
@@ -99,16 +107,31 @@ async def _reset_loop(interval: int):
 @app.post("/api/reset")
 def api_reset():
     init_and_seed()
+    _sessions.clear()  # wipe all conversation histories on DB reset
     return {"ok": True, "ts": datetime.now(timezone.utc).isoformat()}
+
+
+@app.delete("/api/session/{session_id}")
+def api_clear_session(session_id: str):
+    """Clear conversation history for a session (called on mode/caller switch)."""
+    _sessions.pop(session_id, None)
+    return {"ok": True}
+
+
+# ── Per-session conversation history ───────────────────────────────────────
+# Keyed by session_id → list of Bedrock Converse message dicts.
+# Cleared when resetDb() is called or the session_id changes.
+_sessions: dict[str, list] = {}
 
 
 # ── Chat request / response models ─────────────────────────────────────────
 
+
 class ChatRequest(BaseModel):
     session_id: str
     caller_id: int = 7
-    mode: str = "vibe"          # "vibe" | "fortress"
-    translator: str = "plain"   # "plain" | "strands" | "ollama"
+    mode: str = "vibe"  # "vibe" | "guardrails" | "fortress"
+    translator: str = "plain"  # "plain" | "strands" | "ollama"
     message: str
 
 
@@ -122,10 +145,13 @@ def _get_caller(caller_id: int) -> dict:
 
 # ── /api/chat — SSE streaming endpoint ─────────────────────────────────────
 
+
 @app.post("/api/chat")
 async def api_chat(req: ChatRequest):
     caller = _get_caller(req.caller_id)
-    _ctx: dict = {"thinking": ""}  # shared mutable context: plain.py pre-signals thinking before dispatch
+    _ctx: dict = {
+        "thinking": ""
+    }  # shared mutable context: plain.py pre-signals thinking before dispatch
 
     if req.mode == "fortress":
         system_prompt = get_fortress_prompt(
@@ -145,20 +171,75 @@ async def api_chat(req: ChatRequest):
                 logger.info(
                     f"[FORTRESS] ✅ ALLOWED  tool={tool_name}  caller={caller_label}  args={json.dumps(args)}"
                 )
-                write_and_broadcast(req.session_id, req.caller_id, tool_name, args,
-                                    allowed=True, reason="ok", duration_ms=duration_ms,
-                                    thinking=thinking, result=result)
+                write_and_broadcast(
+                    req.session_id,
+                    req.caller_id,
+                    tool_name,
+                    args,
+                    allowed=True,
+                    reason="ok",
+                    duration_ms=duration_ms,
+                    thinking=thinking,
+                    result=result,
+                )
                 return result
             except AuthzError as e:
                 duration_ms = (time.perf_counter() - start) * 1000
                 logger.warning(
                     f"[FORTRESS] 🚫 BLOCKED  tool={tool_name}  caller={caller_label}  reason={e}"
                 )
-                blocked_result = {"error": str(e), "enforcement": "engine"}
-                write_and_broadcast(req.session_id, req.caller_id, tool_name, args,
-                                    allowed=False, reason=str(e), duration_ms=duration_ms,
-                                    thinking=thinking, result=blocked_result)
-                return {"error": str(e)}
+                blocked_result = {
+                    "blocked_by": "engine",
+                    "reason": str(e),
+                    "message": f"🚫 ENGINE BLOCKED — tool '{tool_name}' was called but rejected before execution. Nice try.",
+                }
+                write_and_broadcast(
+                    req.session_id,
+                    req.caller_id,
+                    tool_name,
+                    args,
+                    allowed=False,
+                    reason=str(e),
+                    duration_ms=duration_ms,
+                    thinking=thinking,
+                    result=blocked_result,
+                )
+                # Return the block message to the model so it narrates what happened
+                return blocked_result
+
+    elif req.mode == "guardrails":
+        # Guardrails mode: LLM-layer protection only — vibe tools (no engine authz).
+        # The model is told to refuse; the tools still execute with no checks.
+        # Direct API calls bypass this entirely — that's the demo point.
+        system_prompt = get_guardrails_prompt(
+            caller_name=caller["name"],
+            caller_id=caller["id"],
+            caller_role=caller["role"],
+        )
+        tool_schemas = VIBE_SCHEMAS  # same permissive tools as Vibe — no engine checks
+
+        def dispatch(tool_name: str, args: dict):
+            thinking = _ctx.pop("thinking", "")
+            start = time.perf_counter()
+            caller_label = f"{caller['name']} (P{caller['id']}, {caller['role']})"
+            result = vibe_call(tool_name, args, caller_id=req.caller_id)
+            duration_ms = (time.perf_counter() - start) * 1000
+            # Tool ran with no engine check — guardrails only blocked the LLM response
+            logger.warning(
+                f"[GUARDRAILS] ⚠️  TOOL RAN (no engine check)  tool={tool_name}  caller={caller_label}  args={json.dumps(args)}"
+            )
+            write_and_broadcast(
+                req.session_id,
+                req.caller_id,
+                tool_name,
+                args,
+                allowed=True,
+                reason="LLM-layer only — no engine check",
+                duration_ms=duration_ms,
+                thinking=thinking,
+                result=result,
+            )
+            return result
 
     else:  # vibe
         system_prompt = VIBE_SYSTEM
@@ -174,9 +255,17 @@ async def api_chat(req: ChatRequest):
             logger.warning(
                 f"[VIBE] ⚠️  LEAK  tool={tool_name}  caller={caller_label}  args={json.dumps(args)}  result={json.dumps(result)[:200]}"
             )
-            write_and_broadcast(req.session_id, req.caller_id, tool_name, args,
-                                allowed=True, reason="no authZ check", duration_ms=duration_ms,
-                                thinking=thinking, result=result)
+            write_and_broadcast(
+                req.session_id,
+                req.caller_id,
+                tool_name,
+                args,
+                allowed=True,
+                reason="no authZ check",
+                duration_ms=duration_ms,
+                thinking=thinking,
+                result=result,
+            )
             return result
 
     def emit_audit(tool_name, args, result, allowed, reason, duration_ms, thinking=""):
@@ -186,17 +275,20 @@ async def api_chat(req: ChatRequest):
         if thinking:
             _ctx["thinking"] = thinking
 
-    messages = [{"role": "user", "content": [{"text": req.message}]}]
+    # Build / extend conversation history for this session.
+    history = _sessions.setdefault(req.session_id, [])
+    history.append({"role": "user", "content": [{"text": req.message}]})
     translator_fn = get_translator(req.translator)
 
     async def event_stream():
-        async for evt in translator_fn(messages, system_prompt, tool_schemas, dispatch, emit_audit):
+        async for evt in translator_fn(history, system_prompt, tool_schemas, dispatch, emit_audit):
             yield f"data: {json.dumps(evt)}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 # ── Audit SSE stream ────────────────────────────────────────────────────────
+
 
 @app.get("/api/audit/stream")
 async def audit_stream(session_id: str, request: Request):
@@ -221,6 +313,7 @@ async def audit_stream(session_id: str, request: Request):
 # ── MCP-style HTTP tool endpoints (for Attack 7) ────────────────────────────
 # Vibe: no auth. Fortress: requires X-Caller-Sig header.
 
+
 class ToolCallRequest(BaseModel):
     patient_id: int | None = None
     name: str | None = None
@@ -233,6 +326,7 @@ class ToolCallRequest(BaseModel):
 
 
 # ── Live server log SSE stream ──────────────────────────────────────────────
+
 
 @app.get("/api/logs")
 async def log_stream(request: Request):
@@ -264,6 +358,7 @@ async def log_stream(request: Request):
 
 # ── Engine enforcement demo — bypasses the LLM entirely ─────────────────────
 
+
 class DemoEnforceRequest(BaseModel):
     tool: str = "admin_reset_password"
     args: dict = {"user_id": 5, "new_password": "hacked"}
@@ -278,14 +373,30 @@ async def demo_enforce(req: DemoEnforceRequest):
     """
     with conn() as c:
         row = c.execute("SELECT * FROM patients WHERE id=?", (req.caller_id,)).fetchone()
-    caller_label = f"{row['name']} (P{req.caller_id}, {row['role']})" if row else f"P{req.caller_id}"
+    caller_label = (
+        f"{row['name']} (P{req.caller_id}, {row['role']})" if row else f"P{req.caller_id}"
+    )
     try:
         result = fortress_call(req.tool, req.args, caller_id=req.caller_id)
-        logger.info(f"[FORTRESS] ✅ ALLOWED  tool={req.tool}  caller={caller_label}  (demo-enforce)")
-        return {"allowed": True, "result": result, "enforcement_layer": "engine", "caller": caller_label}
+        logger.info(
+            f"[FORTRESS] ✅ ALLOWED  tool={req.tool}  caller={caller_label}  (demo-enforce)"
+        )
+        return {
+            "allowed": True,
+            "result": result,
+            "enforcement_layer": "engine",
+            "caller": caller_label,
+        }
     except AuthzError as e:
-        logger.warning(f"[FORTRESS] 🚫 BLOCKED  tool={req.tool}  caller={caller_label}  reason={e}  (demo-enforce, no LLM)")
-        return {"allowed": False, "error": str(e), "enforcement_layer": "engine", "caller": caller_label}
+        logger.warning(
+            f"[FORTRESS] 🚫 BLOCKED  tool={req.tool}  caller={caller_label}  reason={e}  (demo-enforce, no LLM)"
+        )
+        return {
+            "allowed": False,
+            "error": str(e),
+            "enforcement_layer": "engine",
+            "caller": caller_label,
+        }
 
 
 @app.post("/mcp-vibe/{tool_name}")
@@ -303,6 +414,7 @@ async def mcp_fortress(tool_name: str, req: ToolCallRequest, x_caller_sig: str =
         raise HTTPException(status_code=401, detail="Missing X-Caller-Sig header")
 
     from .auth_sig import verify_caller
+
     try:
         # Use a demo session_id for MCP calls
         caller_id = verify_caller(x_caller_sig, session_id="mcp-demo")

@@ -2,6 +2,7 @@
 SQLite DB: schema, connection helper, seed runner.
 Called from main.py on startup and every DB_RESET_INTERVAL seconds.
 """
+
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -37,7 +38,8 @@ CREATE TABLE IF NOT EXISTS notes (
     patient_id  INTEGER REFERENCES patients(id),
     author      TEXT,
     content     TEXT,
-    created_at  TEXT
+    created_at  TEXT,
+    doctor_only INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS appointments (
@@ -111,7 +113,7 @@ def init_and_seed() -> None:
             LABS,
         )
         c.executemany(
-            "INSERT INTO notes VALUES (?,?,?,?,?)",
+            "INSERT INTO notes VALUES (?,?,?,?,?,?)",
             NOTES,
         )
         c.executemany(

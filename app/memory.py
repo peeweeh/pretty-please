@@ -4,6 +4,7 @@ Session memory.
 Vibe:     global dict[session_id] → deque  (no TTL, no isolation — the bug)
 Fortress: dict[(session_id, caller_id)] → deque  (scoped + TTL)
 """
+
 import time
 from collections import deque
 from typing import Any

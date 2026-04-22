@@ -2,6 +2,7 @@
 Ollama tool-use loop (~80 lines). Offline fallback.
 Uses qwen2.5:7b by default. Falls back to llama3.1:8b if tool use is flaky.
 """
+
 import json
 import os
 import time
@@ -10,6 +11,7 @@ from typing import Any, Callable
 
 try:
     import ollama as ollama_client
+
     OLLAMA_AVAILABLE = True
 except ImportError:
     OLLAMA_AVAILABLE = False
@@ -78,11 +80,13 @@ async def run(
             duration_ms = (time.perf_counter() - start) * 1000
             emit_audit(tool_name, tool_args, result, True, "ok (ollama)", duration_ms)
 
-            local_messages.append({
-                "role": "tool",
-                "name": tool_name,
-                "content": json.dumps(result),
-            })
+            local_messages.append(
+                {
+                    "role": "tool",
+                    "name": tool_name,
+                    "content": json.dumps(result),
+                }
+            )
 
     yield {"type": "done"}
 
@@ -92,12 +96,14 @@ def _to_ollama_tools(tool_schemas: list[dict]) -> list[dict]:
     tools = []
     for wrapper in tool_schemas:
         spec = wrapper["toolSpec"]
-        tools.append({
-            "type": "function",
-            "function": {
-                "name": spec["name"],
-                "description": spec.get("description", ""),
-                "parameters": spec.get("inputSchema", {}).get("json", {}),
-            },
-        })
+        tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": spec["name"],
+                    "description": spec.get("description", ""),
+                    "parameters": spec.get("inputSchema", {}).get("json", {}),
+                },
+            }
+        )
     return tools

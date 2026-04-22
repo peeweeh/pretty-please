@@ -2,10 +2,9 @@
 Guardrail helpers for Fortress mode.
 These are the fixes. They're small on purpose — that's the talking point.
 """
+
 import hashlib
 import re
-import time
-from collections import deque
 from typing import Any
 
 from .db import conn
@@ -58,8 +57,14 @@ def redact_pii(obj: Any) -> Any:
     Catches the obvious ones — not a complete PHI scrubber.
     """
     SENSITIVE_KEYS = {
-        "ssn_last4", "ssn", "dob", "email", "phone",
-        "new_password", "password", "body",
+        "ssn_last4",
+        "ssn",
+        "dob",
+        "email",
+        "phone",
+        "new_password",
+        "password",
+        "body",
     }
     VALUE_PATTERNS = [
         (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "[REDACTED:SSN]"),

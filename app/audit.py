@@ -2,10 +2,10 @@
 Audit log writer and SSE stream helper.
 Every tool call in both modes goes through write_audit().
 """
+
 import asyncio
 import json
 import sqlite3
-import time
 from datetime import datetime, timezone
 
 from .db import conn

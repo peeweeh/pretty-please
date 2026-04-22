@@ -3,6 +3,7 @@ Strands Agents SDK translator (~40 lines).
 Same behavior as plain.py — different SDK. Same architectural bugs/fixes.
 Talking point: the vuln is in the tools, not the SDK.
 """
+
 import os
 from collections.abc import AsyncGenerator
 from typing import Any, Callable
@@ -10,6 +11,7 @@ from typing import Any, Callable
 try:
     from strands import Agent
     from strands.models import BedrockModel
+
     STRANDS_AVAILABLE = True
 except ImportError:
     STRANDS_AVAILABLE = False
@@ -41,6 +43,7 @@ async def run(
 
     # Strands is synchronous — run in thread to avoid blocking event loop
     import asyncio
+
     # Extract plain text from message content (may be list [{text:...}] or str)
     raw = messages[-1]["content"] if messages else ""
     if isinstance(raw, list):
@@ -88,7 +91,7 @@ def _build_strands_tools(
 
         # Build a properly-annotated function so strands can generate a correct schema.
         # All params typed as str — Bedrock/Haiku will coerce numerics anyway.
-        param_sig  = ", ".join(f"{p}: str = ''" for p in param_names)
+        param_sig = ", ".join(f"{p}: str = ''" for p in param_names)
         kwargs_dict = "{" + ", ".join(f'"{p}": {p}' for p in param_names) + "}"
 
         src = f"""

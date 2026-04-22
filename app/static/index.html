@@ -19,7 +19,7 @@
     }
   </script>
   <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col" x-data="demoApp()" x-init="init()">
 
@@ -58,9 +58,12 @@
       <button @click="mode='vibe'; resetChat()"
         :class="mode==='vibe' ? 'btn-active-vibe' : 'btn-inactive'"
         class="btn">🌈 Vibe</button>
+      <button @click="mode='guardrails'; resetChat()"
+        :class="mode==='guardrails' ? 'btn-active-guardrails' : 'btn-inactive'"
+        class="btn">⚠️ Guardrails</button>
       <button @click="mode='fortress'; resetChat()"
         :class="mode==='fortress' ? 'btn-active-fortress' : 'btn-inactive'"
-        class="btn">🛡 Fortress</button>
+        class="btn">🔒 Fortress</button>
     </div>
     <!-- Translator toggle -->
     <div class="flex items-center gap-2">
@@ -71,9 +74,6 @@
       <button @click="translator='strands'"
         :class="translator==='strands' ? 'btn-active-neutral' : 'btn-inactive'"
         class="btn">Strands</button>
-      <button @click="translator='ollama'"
-        :class="translator==='ollama' ? 'btn-active-neutral' : 'btn-inactive'"
-        class="btn">Ollama</button>
     </div>
     <!-- Attack dropdown -->
     <div class="flex items-center gap-2 ml-auto">
@@ -85,9 +85,9 @@
         <option value="3">3. Escalate to admin tool (Confused deputy)</option>
         <option value="4">4. Run arbitrary SQL (Injection via tool schema)</option>
         <option value="5">5. Leak previous session's data (Cross-session)</option>
-        <option value="6">6. Burn tokens until stopped (Missing rate limits)</option>
-        <option value="7">7. Call tool server directly — no LLM needed</option>
-        <option value="8">8. Show what's in the server logs (PII in logs)</option>
+        <option value="6">6. Burn tokens — drain the budget</option>
+        <option value="7">7. Read server logs — see what leaked</option>
+        <option value="8">8. IDOR + Injection — read patient 6, get hijacked</option>
       </select>
     </div>
   </section>
@@ -99,8 +99,9 @@
     <section class="flex flex-col border-r border-slate-700 overflow-hidden">
       <div class="bg-slate-800 px-4 py-2 border-b border-slate-700">
         <h2 class="text-sm font-semibold text-slate-300">💬 Chat with Mira</h2>
-        <span class="text-xs" :class="mode==='vibe' ? 'text-orange-400' : 'text-green-400'"
-          x-text="mode==='vibe' ? '🌈 Vibe mode — no guardrails' : '🛡 Fortress mode — all guardrails active'">
+        <span class="text-xs"
+          :class="mode==='vibe' ? 'text-orange-400' : mode==='guardrails' ? 'text-yellow-400' : 'text-green-400'"
+          x-text="mode==='vibe' ? '🌈 Vibe mode — no protection, everything leaks' : mode==='guardrails' ? '⚠️ Guardrails mode — AI refuses to narrate, but tool still ran' : '🔒 Fortress mode — engine blocks at the source'">
         </span>
       </div>
       <!-- Caller identity context bar -->
@@ -121,6 +122,12 @@
               : 'bg-slate-700 text-slate-100 rounded-lg rounded-bl-sm px-4 py-2 max-w-lg text-sm'"
               x-html="m.html">
             </div>
+          </div>
+          <!-- Per-message token burn (bot messages only) -->
+          <div x-show="m.role === 'assistant' && m.tokens" class="flex justify-start pl-2">
+            <span class="text-xs text-slate-500 font-mono"
+              x-text="m.tokens ? '🔥 ' + (m.tokens.total).toLocaleString() + ' tokens · $' + m.tokens.cost.toFixed(5) : ''">
+            </span>
           </div>
         </template>
         <div x-show="streaming" class="flex justify-start">
@@ -170,17 +177,18 @@
               <div class="flex items-center gap-2">
                 <span class="text-xs text-slate-500" x-text="e.duration_ms + 'ms'"></span>
                 <span class="text-xs px-2 py-0.5 rounded font-semibold" :class="e.badgeClass"
-                  x-text="e.allowed ? (mode==='fortress' ? '\u2705 ALLOWED' : '\ud83d\udd34 ALLOWED') : '\ud83d\udd35 BLOCKED'">
+                  x-text="!e.allowed ? '🚫 ENGINE BLOCKED' : mode==='fortress' ? '✅ ALLOWED' : mode==='guardrails' ? '⚠️ UNGUARDED' : '🔴 LEAKED'">
                 </span>
                 <span class="text-xs text-slate-500" x-text="e.expanded ? '\u25b2' : '\u25bc'"></span>
               </div>
             </div>
 
-            <!-- Collapsed: compact args -->
+            <!-- Collapsed: compact reason for blocked -->
             <div class="mt-1" x-show="!e.expanded">
               <code class="text-xs text-slate-400" x-text="JSON.stringify(e.args)"></code>
             </div>
-            <div class="mt-0.5 text-xs text-slate-500" x-show="!e.expanded && e.reason" x-text="e.reason"></div>
+            <div class="mt-0.5 text-xs font-semibold" x-show="!e.expanded && !e.allowed" x-text="'🚫 ' + e.reason" class="text-red-400"></div>
+            <div class="mt-0.5 text-xs text-slate-500" x-show="!e.expanded && e.allowed && e.reason" x-text="e.reason"></div>
 
             <!-- Expanded: full details -->
             <div class="mt-3 space-y-3" x-show="e.expanded" @click.stop>
@@ -201,7 +209,7 @@
                     :class="e.allowed ? 'text-slate-500' : 'text-red-400'">
                     <span x-text="e.allowed ? 'Result' : '🚫 Engine Rejection'"></span>
                   </div>
-                  <pre class="text-xs rounded p-2 overflow-x-auto max-h-36"
+                  <pre class="text-xs rounded p-2 overflow-x-auto"
                     :class="e.allowed ? 'text-slate-300 bg-slate-900' : 'text-red-300 bg-red-950 border border-red-800'"
                     x-text="JSON.stringify(e.result, null, 2)"></pre>
                 </div>
@@ -210,7 +218,7 @@
               <template x-if="e.thinking">
                 <div>
                   <div class="text-xs font-semibold text-purple-400 uppercase tracking-wider mb-1">💭 AI Reasoning</div>
-                  <div class="text-xs text-slate-300 bg-slate-900 rounded p-2 border-l-2 border-purple-600 whitespace-pre-wrap max-h-48 overflow-y-auto"
+                  <div class="text-xs text-slate-300 bg-slate-900 rounded p-2 border-l-2 border-purple-600 whitespace-pre-wrap"
                        x-text="e.thinking"></div>
                 </div>
               </template>
@@ -256,75 +264,6 @@
     </span>
   </footer>
 
-  <!-- Attack 7 modal -->
-  <div x-show="showCurlModal" @click.away="showCurlModal=false"
-    class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-    <div class="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-3xl w-full mx-4">
-      <h3 class="text-lg font-bold text-white mb-4">Attack 7 — No LLM Required</h3>
-      <p class="text-sm text-slate-300 mb-4">
-        The Vibe tool endpoints have no auth. Curl them directly. The LLM is just a middleman.
-      </p>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <div class="text-xs font-bold text-orange-400 mb-2">🔴 Vibe (no auth)</div>
-          <pre class="bg-slate-900 rounded p-3 text-xs text-green-400 overflow-x-auto">curl -X POST localhost:8000/mcp-vibe/get_patient_labs \
-  -H "Content-Type: application/json" \
-  -d '{"patient_id": 12}'
-
-# Returns: Taylor Morgan's HIV+ labs
-# No token. No auth. Just works.</pre>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-green-400 mb-2">🛡 Fortress (HMAC required)</div>
-          <pre class="bg-slate-900 rounded p-3 text-xs text-red-400 overflow-x-auto">curl -X POST localhost:8000/mcp-fortress/get_patient_labs \
-  -H "Content-Type: application/json" \
-  -d '{"patient_id": 12}'
-
-# Returns: 401 Unauthorized
-# Missing X-Caller-Sig header</pre>
-        </div>
-      </div>
-      <button @click="showCurlModal=false" class="mt-4 bg-slate-700 hover:bg-slate-600 text-white rounded px-4 py-2 text-sm">Close</button>
-    </div>
-  </div>
-
-  <!-- Attack 8 modal -->
-  <div x-show="showLogsModal" @click.away="showLogsModal=false"
-    class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-    <div class="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-3xl w-full mx-4">
-      <h3 class="text-lg font-bold text-white mb-4">Attack 8 — PII in Logs</h3>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <div class="text-xs font-bold text-orange-400 mb-2">🔴 Vibe stdout</div>
-          <pre class="bg-slate-900 rounded p-3 text-xs text-red-300 overflow-x-auto">INFO: tool=search_patients args={
-  "name": "Taylor"
-}
-INFO: result=[{
-  "name": "Taylor Morgan",
-  "dob": "1987-10-23",
-  "email": "taylor@example.com",
-  "ssn_last4": "9930",
-  "condition_summary": "HIV+..."
-}]</pre>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-green-400 mb-2">🛡 Fortress stdout</div>
-          <pre class="bg-slate-900 rounded p-3 text-xs text-green-300 overflow-x-auto">INFO: tool=search_patients args={
-  "name": "[REDACTED]"
-}
-INFO: result=[{
-  "name": "Taylor Morgan",
-  "dob": "[REDACTED:DOB]",
-  "email": "[REDACTED:EMAIL]",
-  "ssn_last4": "[REDACTED]",
-  "condition_summary": "[REDACTED]"
-}]</pre>
-        </div>
-      </div>
-      <button @click="showLogsModal=false" class="mt-4 bg-slate-700 hover:bg-slate-600 text-white rounded px-4 py-2 text-sm">Close</button>
-    </div>
-  </div>
-
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=5"></script>
 </body>
 </html>

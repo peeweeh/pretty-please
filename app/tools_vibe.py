@@ -2,8 +2,8 @@
 tools_vibe.py — The BAD tools. No authorization, no guardrails.
 The star of the demo. Every tool leaks.
 """
-import json
 
+from . import log_store
 from .db import conn
 
 # ── Tool schemas (Bedrock Converse format) ─────────────────────────────────
@@ -109,12 +109,33 @@ TOOL_SCHEMAS = [
             },
         }
     },
+    {
+        "toolSpec": {
+            "name": "get_recent_logs",
+            "description": "Return the last 30 server log entries. Shows recent tool calls, arguments, and results that were written to the system log.",
+            "inputSchema": {"json": {"type": "object", "properties": {}, "required": []}},
+        }
+    },
+    {
+        "toolSpec": {
+            "name": "get_patient_notes",
+            "description": "Get clinical notes for any patient by ID.",
+            "inputSchema": {
+                "json": {
+                    "type": "object",
+                    "properties": {"patient_id": {"type": "integer", "description": "Patient ID"}},
+                    "required": ["patient_id"],
+                }
+            },
+        }
+    },
 ]
 
 ALL = [s["toolSpec"]["name"] for s in TOOL_SCHEMAS]
 
 
 # ── Tool implementations — intentionally no authZ ──────────────────────────
+
 
 def get_my_labs(caller_id: int = 7, **_) -> list[dict]:
     """No authZ. Returns labs for whoever session says the caller is."""
@@ -137,13 +158,21 @@ def get_patient_labs(patient_id: int, **_) -> list[dict]:
 
 
 def get_my_notes(caller_id: int = 7, **_) -> list[dict]:
-    """Returns raw note content — no untrusted wrapping."""
+    """Returns ALL notes including doctor_only — no access control."""
     with conn() as c:
         rows = c.execute(
-            "SELECT author, content, created_at FROM notes WHERE patient_id=? ORDER BY created_at DESC",
+            "SELECT author, content, created_at, doctor_only FROM notes WHERE patient_id=? ORDER BY created_at DESC",
             (caller_id,),
         ).fetchall()
-    return [dict(r) for r in rows]
+    return [
+        {
+            "author": r["author"],
+            "content": r["content"],
+            "created_at": r["created_at"],
+            "visibility": "👨‍⚕️ Doctor only" if r["doctor_only"] else "👥 Patient & Doctor",
+        }
+        for r in rows
+    ]
 
 
 def search_patients(name: str, **_) -> list[dict]:
@@ -195,6 +224,36 @@ def query_database(sql: str, **_) -> list[dict]:
             return [{"error": str(e)}]
 
 
+def get_recent_logs(**_) -> dict:
+    """Returns raw server log entries — in Vibe mode these contain full PII."""
+    entries = log_store.get_all()
+    if not entries:
+        return {"entries": [], "note": "No log entries yet. Try calling a tool first."}
+    return {
+        "warning": "These are raw server logs. In Vibe mode they contain unredacted PII.",
+        "count": len(entries),
+        "entries": entries,
+    }
+
+
+def get_patient_notes(patient_id: int, **_) -> list[dict]:
+    """No authZ. Any caller can read any patient's notes — including doctor-only ones."""
+    with conn() as c:
+        rows = c.execute(
+            "SELECT author, content, created_at, doctor_only FROM notes WHERE patient_id=? ORDER BY created_at DESC",
+            (patient_id,),
+        ).fetchall()
+    return [
+        {
+            "author": r["author"],
+            "content": r["content"],
+            "created_at": r["created_at"],
+            "visibility": "👨‍⚕️ Doctor only" if r["doctor_only"] else "👥 Patient & Doctor",
+        }
+        for r in rows
+    ]
+
+
 # ── Dispatch ──────────────────────────────────────────────────────────────
 
 _FN_MAP = {
@@ -207,6 +266,8 @@ _FN_MAP = {
     "admin_reset_password": admin_reset_password,
     "admin_list_all_patients": admin_list_all_patients,
     "query_database": query_database,
+    "get_recent_logs": get_recent_logs,
+    "get_patient_notes": get_patient_notes,
 }
 
 

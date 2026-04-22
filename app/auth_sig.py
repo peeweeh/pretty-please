@@ -3,6 +3,7 @@ Signed caller identity for Fortress mode (L1 guardrail).
 The caller_id comes from the server-side session — the LLM never sees it
 as a parameter it can forge.
 """
+
 import hashlib
 import hmac
 import os
