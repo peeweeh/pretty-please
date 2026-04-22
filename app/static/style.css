@@ -64,3 +64,72 @@
   0% { color: #facc15; }
   100% { color: #e2e8f0; }
 }
+
+/* ── Markdown content rendered in chat bubbles ──────────────────────────── */
+.md-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
+}
+.md-content th,
+.md-content td {
+  border: 1px solid #475569;
+  padding: 0.2rem 0.5rem;
+  text-align: left;
+}
+.md-content th { background: #1e293b; font-weight: 600; color: #94a3b8; }
+.md-content tr:hover td { background: rgba(30,41,59,0.5); }
+.md-content strong { color: #f1f5f9; font-weight: 700; }
+.md-content em { color: #cbd5e1; }
+.md-content code {
+  background: #1e293b;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.85em;
+  color: #7dd3fc;
+}
+.md-content p { margin: 0.3rem 0; }
+.md-content p:first-child { margin-top: 0; }
+.md-content p:last-child { margin-bottom: 0; }
+.md-content ul,
+.md-content ol { margin: 0.25rem 0; padding-left: 1.25rem; }
+.md-content li { margin: 0.1rem 0; }
+.md-content h1, .md-content h2, .md-content h3 {
+  color: #e2e8f0; font-weight: 700; margin: 0.5rem 0 0.25rem;
+}
+
+/* ── Thinking block (collapsible in chat bubble) ────────────────────────── */
+.thinking-block {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-left: 3px solid #7c3aed;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+.thinking-block summary {
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  color: #a78bfa;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  user-select: none;
+  list-style: none;
+}
+.thinking-block summary::-webkit-details-marker { display: none; }
+.thinking-block summary:hover { color: #c4b5fd; }
+.thinking-tag { font-weight: 400; opacity: 0.6; }
+.thinking-content {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow-y: auto;
+  border-top: 1px solid #334155;
+}
+
+/* ── Audit entry — clickable, hover highlight ───────────────────────────── */
+.audit-entry { cursor: pointer; }
+.audit-entry:hover { filter: brightness(1.08); }

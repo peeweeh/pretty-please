@@ -7,6 +7,23 @@ function uuid4() {
   });
 }
 
+/** Render an assistant message as HTML (markdown + optional thinking block). */
+function buildBotHtml(raw, thinking) {
+  let html = '';
+  if (thinking) {
+    const esc = thinking.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    html += `<details class="thinking-block"><summary>💭 Model reasoning <span class="thinking-tag">(click to expand)</span></summary><div class="thinking-content">${esc}</div></details>`;
+  }
+  if (raw) {
+    // marked is loaded from CDN; fall back to escaped text if not available yet
+    const rendered = (typeof marked !== 'undefined')
+      ? marked.parse(raw)
+      : raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    html += `<div class="md-content">${rendered}</div>`;
+  }
+  return html || '';
+}
+
 function demoApp() {
   return {
     mode: 'vibe',
@@ -68,6 +85,7 @@ function demoApp() {
         entry.labelClass = 'text-orange-400';
         entry.badgeClass = 'bg-red-900 text-red-300';
       }
+      entry.expanded = false;  // click to expand details
     },
 
     async sendMessage() {
@@ -91,8 +109,8 @@ function demoApp() {
         message: userMsg,
       };
 
-      const botMsg = {role: 'assistant', html: ''};
-      this.messages.push(botMsg);
+      this.messages.push({role: 'assistant', raw: '', thinking: '', html: ''});
+      const botIdx = this.messages.length - 1;
 
       try {
         const resp = await fetch('/api/chat', {
@@ -102,7 +120,7 @@ function demoApp() {
         });
 
         if (!resp.ok) {
-          botMsg.html = `<span class="text-red-400">Error: ${resp.status} ${resp.statusText}</span>`;
+          this.messages[botIdx].html = `<span class="text-red-400">Error: ${resp.status} ${resp.statusText}</span>`;
           this.streaming = false;
           return;
         }
@@ -124,7 +142,21 @@ function demoApp() {
             try {
               const evt = JSON.parse(part.slice(5).trim());
               if (evt.type === 'text') {
-                botMsg.html += escapeHtml(evt.delta);
+                this.messages[botIdx].raw += evt.delta;
+                this.messages[botIdx].html = buildBotHtml(
+                  this.messages[botIdx].raw,
+                  this.messages[botIdx].thinking
+                );
+                this.$nextTick(() => {
+                  const el = this.$refs.messages;
+                  if (el) el.scrollTop = el.scrollHeight;
+                });
+              } else if (evt.type === 'thinking') {
+                this.messages[botIdx].thinking += evt.delta;
+                this.messages[botIdx].html = buildBotHtml(
+                  this.messages[botIdx].raw,
+                  this.messages[botIdx].thinking
+                );
                 this.$nextTick(() => {
                   const el = this.$refs.messages;
                   if (el) el.scrollTop = el.scrollHeight;
@@ -138,7 +170,7 @@ function demoApp() {
           }
         }
       } catch (err) {
-        botMsg.html = `<span class="text-red-400">Connection error: ${err.message}</span>`;
+        this.messages[botIdx].html = `<span class="text-red-400">Connection error: ${err.message}</span>`;
       } finally {
         this.streaming = false;
       }

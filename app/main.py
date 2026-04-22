@@ -92,6 +92,7 @@ def _get_caller(caller_id: int) -> dict:
 @app.post("/api/chat")
 async def api_chat(req: ChatRequest):
     caller = _get_caller(req.caller_id)
+    _ctx: dict = {"thinking": ""}  # shared mutable context: plain.py pre-signals thinking before dispatch
 
     if req.mode == "fortress":
         system_prompt = get_fortress_prompt(
@@ -102,17 +103,20 @@ async def api_chat(req: ChatRequest):
         tool_schemas = get_schemas_for_caller(caller["role"])
 
         def dispatch(tool_name: str, args: dict):
+            thinking = _ctx.pop("thinking", "")
             start = time.perf_counter()
             try:
                 result = fortress_call(tool_name, args, caller_id=req.caller_id)
                 duration_ms = (time.perf_counter() - start) * 1000
                 write_and_broadcast(req.session_id, req.caller_id, tool_name, args,
-                                    allowed=True, reason="ok", duration_ms=duration_ms)
+                                    allowed=True, reason="ok", duration_ms=duration_ms,
+                                    thinking=thinking)
                 return result
             except AuthzError as e:
                 duration_ms = (time.perf_counter() - start) * 1000
                 write_and_broadcast(req.session_id, req.caller_id, tool_name, args,
-                                    allowed=False, reason=str(e), duration_ms=duration_ms)
+                                    allowed=False, reason=str(e), duration_ms=duration_ms,
+                                    thinking=thinking)
                 return {"error": str(e)}
 
     else:  # vibe
@@ -120,19 +124,23 @@ async def api_chat(req: ChatRequest):
         tool_schemas = VIBE_SCHEMAS
 
         def dispatch(tool_name: str, args: dict):
+            thinking = _ctx.pop("thinking", "")
             start = time.perf_counter()
             result = vibe_call(tool_name, args, caller_id=req.caller_id)
             duration_ms = (time.perf_counter() - start) * 1000
             # Vibe: log PII in plaintext — that's the point
             logger.info(f"[VIBE] tool={tool_name} args={json.dumps(args)} result={json.dumps(result)}")
             write_and_broadcast(req.session_id, req.caller_id, tool_name, args,
-                                allowed=True, reason="no authZ check", duration_ms=duration_ms)
+                                allowed=True, reason="no authZ check", duration_ms=duration_ms,
+                                thinking=thinking)
             return result
 
-    def emit_audit(tool_name, args, result, allowed, reason, duration_ms):
-        # Already called write_and_broadcast inside dispatch; this is for
-        # translators that bypass dispatch (e.g. Strands callback)
-        pass
+    def emit_audit(tool_name, args, result, allowed, reason, duration_ms, thinking=""):
+        # plain.py calls this BEFORE dispatch to pre-store thinking in _ctx.
+        # Strands calls this AFTER dispatch (no-op for thinking since strands
+        # handles its own tool routing).
+        if thinking:
+            _ctx["thinking"] = thinking
 
     messages = [{"role": "user", "content": [{"text": req.message}]}]
     translator_fn = get_translator(req.translator)
