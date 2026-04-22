@@ -134,7 +134,7 @@ async def api_chat(req: ChatRequest):
         # translators that bypass dispatch (e.g. Strands callback)
         pass
 
-    messages = [{"role": "user", "content": req.message}]
+    messages = [{"role": "user", "content": [{"text": req.message}]}]
     translator_fn = get_translator(req.translator)
 
     async def event_stream():

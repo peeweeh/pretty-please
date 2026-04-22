@@ -86,7 +86,7 @@ async def run(
                 tool_results.append({
                     "toolResult": {
                         "toolUseId": tu["toolUseId"],
-                        "content": [{"json": result}],
+                        "content": [{"json": result if isinstance(result, dict) else {"result": result}}],
                     }
                 })
 
