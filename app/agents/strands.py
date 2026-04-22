@@ -41,7 +41,12 @@ async def run(
 
     # Strands is synchronous — run in thread to avoid blocking event loop
     import asyncio
-    last_user_msg = messages[-1]["content"] if messages else ""
+    # Extract plain text from message content (may be list [{text:...}] or str)
+    raw = messages[-1]["content"] if messages else ""
+    if isinstance(raw, list):
+        last_user_msg = " ".join(block.get("text", "") for block in raw if isinstance(block, dict))
+    else:
+        last_user_msg = str(raw)
     loop = asyncio.get_event_loop()
 
     try:
@@ -61,9 +66,12 @@ def _build_strands_tools(
 ) -> list:
     """
     Convert Bedrock-format schemas into Strands @tool decorated functions.
-    We do this dynamically so the dispatch logic stays in one place.
+    Uses exec() to generate functions with the exact parameter names+types
+    that @strands.tool (and the underlying LLM) need to introspect correctly.
+    Without proper signatures, Strands produces incomplete schemas and Haiku
+    never calls the tools.
     """
-    import time
+    import time as _time
 
     try:
         from strands import tool as strands_tool
@@ -74,21 +82,34 @@ def _build_strands_tools(
     for schema_wrapper in tool_schemas:
         spec = schema_wrapper["toolSpec"]
         tool_name = spec["name"]
-        description = spec.get("description", "")
+        description = spec.get("description", "no description")
+        properties = spec.get("inputSchema", {}).get("json", {}).get("properties", {})
+        param_names = list(properties.keys())
 
-        # Create a closure for each tool
-        def make_fn(name):
-            def fn(**kwargs):
-                start = time.perf_counter()
-                result = dispatch_fn(name, kwargs)
-                duration_ms = (time.perf_counter() - start) * 1000
-                emit_audit(name, kwargs, result, True, "ok (strands)", duration_ms)
-                return str(result)
-            fn.__name__ = name
-            fn.__doc__ = description
-            return fn
+        # Build a properly-annotated function so strands can generate a correct schema.
+        # All params typed as str — Bedrock/Haiku will coerce numerics anyway.
+        param_sig  = ", ".join(f"{p}: str = ''" for p in param_names)
+        kwargs_dict = "{" + ", ".join(f'"{p}": {p}' for p in param_names) + "}"
 
-        tool_fn = strands_tool(make_fn(tool_name))
-        built.append(tool_fn)
+        src = f"""
+def {tool_name}({param_sig}):
+    '''{description}'''
+    start = _time.perf_counter()
+    # Coerce numeric-looking strings to int for tool dispatch
+    kwargs = {{}}
+    for k, v in {kwargs_dict}.items():
+        try:
+            kwargs[k] = int(v) if str(v).lstrip('-').isdigit() else v
+        except (ValueError, TypeError):
+            kwargs[k] = v
+    result = _dispatch("{tool_name}", kwargs)
+    duration_ms = (_time.perf_counter() - start) * 1000
+    _emit("{tool_name}", kwargs, result, True, "ok (strands)", duration_ms)
+    return str(result)
+"""
+        globs = {"_time": _time, "_dispatch": dispatch_fn, "_emit": emit_audit}
+        exec(src, globs)  # noqa: S102 — demo-only dynamic tool generation
+        fn = globs[tool_name]
+        built.append(strands_tool(fn))
 
     return built
