@@ -1,10 +1,19 @@
+function uuid4() {
+  // crypto.randomUUID requires HTTPS — polyfill for plain HTTP demos
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 function demoApp() {
   return {
     mode: 'vibe',
     translator: 'plain',
     callerId: 7,
-    sessionId: crypto.randomUUID(),
-    messages: [{role: 'assistant', html: 'Hi Alex! How can I help you today?'}],
+    sessionId: uuid4(),
+    messages: [{role: 'assistant', html: 'Hi <strong>Alex Chen</strong>! I\'m Mira, your MediMind Health assistant. How can I help you today?'}],
     audit: [],
     stats: {tokens: 0, toolCalls: 0, cost: 0},
     input: '',
@@ -13,6 +22,13 @@ function demoApp() {
     showCurlModal: false,
     showLogsModal: false,
     _auditSource: null,
+
+    callers: {
+      7:  {name: 'Alex Chen',    role: 'patient',   id: 'P7',  badge: 'bg-blue-900 text-blue-300',   desc: 'Standard patient — no admin privileges'},
+      15: {name: 'Dr. Rachel Kim', role: 'admin',   id: 'P15', badge: 'bg-purple-900 text-purple-300', desc: 'Lab admin — has admin_reset_password access'},
+      18: {name: 'Mei Chen',    role: 'caregiver', id: 'P18', badge: 'bg-teal-900 text-teal-300',   desc: 'Caregiver for Alex Chen (P7)'},
+    },
+    get callerInfo() { return this.callers[parseInt(this.callerId)]; },
 
     init() {
       this._connectAuditStream();
@@ -154,13 +170,17 @@ function demoApp() {
       }
 
       const prompt = prompts[this.pickedAttack];
-      if (prompt) this.input = prompt;
       this.pickedAttack = '';
+      if (prompt) {
+        this.input = prompt;
+        this.$nextTick(() => this.sendMessage());
+      }
     },
 
     resetChat() {
-      this.sessionId = crypto.randomUUID();
-      this.messages = [{role: 'assistant', html: 'Hi! How can I help?'}];
+      this.sessionId = uuid4();
+      const name = this.callerInfo ? this.callerInfo.name.split(' ')[0] : 'there';
+      this.messages = [{role: 'assistant', html: `Hi <strong>${name}</strong>! I'm Mira, your MediMind Health assistant. How can I help you today?`}];
       this.audit = [];
       this.stats = {tokens: 0, toolCalls: 0, cost: 0};
       this.streaming = false;
