@@ -23,9 +23,10 @@ from .audit import (
     unregister_audit_queue,
     write_and_broadcast,
 )
-from .db import conn, init_and_seed
+from .db import conn, init_and_seed, init_summit_tables
 from .guardrails import AuthzError
 from .prompts import VIBE_SYSTEM, get_fortress_prompt, get_guardrails_prompt
+from .routes_summit import router as summit_router
 from .tools_fortress import call as fortress_call
 from .tools_fortress import get_schemas_for_caller
 from .tools_vibe import TOOL_SCHEMAS as VIBE_SCHEMAS
@@ -61,6 +62,7 @@ class _DemoLogHandler(logging.Handler):
 
 
 app = FastAPI(title="pretty-please — MediMind Health Demo")
+app.include_router(summit_router)
 
 # ── Static files ────────────────────────────────────────────────────────────
 _static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -88,6 +90,7 @@ def health():
 @app.on_event("startup")
 async def startup():
     init_and_seed()
+    init_summit_tables()
     # Register the demo log handler on the root logger
     _handler = _DemoLogHandler()
     logging.getLogger().addHandler(_handler)
@@ -102,11 +105,13 @@ async def _reset_loop(interval: int):
         await asyncio.sleep(interval)
         logger.info("Auto-reseed triggered.")
         init_and_seed()
+        init_summit_tables()
 
 
 @app.post("/api/reset")
 def api_reset():
     init_and_seed()
+    init_summit_tables()
     _sessions.clear()  # wipe all conversation histories on DB reset
     return {"ok": True, "ts": datetime.now(timezone.utc).isoformat()}
 

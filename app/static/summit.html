@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Summit Demo — AI Middleware on Bedrock</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { colors: { slate: { 900: '#0f172a', 800: '#1e293b', 700: '#334155' } } } }
+    }
+  </script>
+  <script src="/static/summit.js?v=4"></script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <link rel="stylesheet" href="/static/style.css?v=4">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col" x-data="summitApp()" x-init="init()">
+
+  <!-- Top nav -->
+  <header class="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center gap-4">
+    <h1 class="text-lg font-bold">MediMind Health</h1>
+    <nav class="flex items-center gap-2 ml-4 text-sm">
+      <a href="/" class="px-3 py-1 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-700">DEFCON Demo</a>
+      <a href="/summit" class="px-3 py-1 rounded bg-teal-700 text-white font-semibold">Summit Demo</a>
+      <a href="/how-it-works" class="px-3 py-1 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-700">How it Works</a>
+    </nav>
+    <span class="ml-auto text-xs text-slate-500 italic">One Guardrails Config, Every Model Call — AI Middleware on Bedrock</span>
+  </header>
+
+  <!-- Identity bar -->
+  <div class="bg-slate-800/60 border-b border-slate-700 px-4 py-2 flex items-center gap-3 text-sm">
+    <span class="text-slate-500 font-semibold uppercase tracking-wider text-xs">Identity</span>
+    <label class="text-slate-400">tenant</label>
+    <select x-model="identity.tenant_id" class="bg-slate-700 text-slate-100 rounded px-2 py-1 text-xs border border-slate-600">
+      <option value="lab-default">lab-default</option>
+      <option value="lab-acme">lab-acme</option>
+    </select>
+    <label class="text-slate-400">user_id</label>
+    <select x-model="identity.user_id" class="bg-slate-700 text-slate-100 rounded px-2 py-1 text-xs border border-slate-600">
+      <option value="7">7 — Alex Chen (patient)</option>
+      <option value="12">12 — Taylor Morgan (patient)</option>
+      <option value="15">15 — Dr. Rachel Kim (clinician)</option>
+    </select>
+    <span class="text-slate-500 text-xs ml-auto">session: <span x-text="identity.session_id.substring(0,8)" class="font-mono"></span></span>
+  </div>
+
+  <!-- Main grid: products (left) + inspector (right) -->
+  <main class="flex-1 grid grid-cols-[1fr_420px] gap-0 overflow-hidden" style="height: calc(100vh - 110px)">
+
+    <!-- Products column -->
+    <section class="flex flex-col overflow-y-auto border-r border-slate-700">
+
+      <!-- Patient Chat card -->
+      <div class="border-b border-slate-700 flex flex-col" style="flex: 1 1 50%">
+        <header class="px-4 py-2 bg-blue-950 border-b border-blue-800 flex items-center gap-2">
+          <span class="text-lg">🟦</span>
+          <h2 class="font-bold text-blue-200">Patient Chat <span class="text-xs font-normal text-blue-400">(Mira)</span></h2>
+          <div class="ml-auto flex items-center gap-2">
+            <label class="text-xs text-blue-300">mode</label>
+            <select x-model="patientMode" class="bg-slate-800 text-slate-100 rounded px-2 py-0.5 text-xs border border-slate-600">
+              <option value="chatbot_session">chatbot_session</option>
+              <option value="agentic">agentic</option>
+              <option value="streaming">streaming</option>
+            </select>
+            <button @click="resetSession()" class="text-xs px-2 py-0.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200" title="Clear cached conversation">reset</button>
+            <span class="text-xs text-slate-500 font-mono">product_id: patient_chat</span>
+          </div>
+        </header>
+        <!-- Sample prompts (click to send) -->
+        <div class="bg-blue-950/40 border-b border-blue-900/60 px-3 py-2 flex flex-wrap gap-1.5">
+          <span class="text-xs text-blue-300/70 self-center mr-1">try:</span>
+          <template x-for="p in patientSamples" :key="p">
+            <button @click="usePatientSample(p)"
+                    class="text-xs px-2 py-1 bg-blue-900/50 hover:bg-blue-700 text-blue-100 rounded border border-blue-800 transition"
+                    x-text="p"></button>
+          </template>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-3" x-ref="patientMessages">
+          <template x-for="m in patientChat" :key="m.id">
+            <div :class="m.role === 'user' ? 'text-right' : 'text-left'">
+              <div class="inline-block max-w-[90%] rounded-lg px-3 py-2 text-sm"
+                   :class="m.role === 'user' ? 'bg-blue-700 text-white' : 'bg-slate-700 text-slate-100'">
+                <div x-text="m.text" class="whitespace-pre-wrap"></div>
+              </div>
+            </div>
+          </template>
+          <div x-show="!patientChat.length" class="text-slate-500 text-sm italic">Start a patient-chat conversation. Try: "give me my labs"</div>
+        </div>
+        <div class="border-t border-slate-700 p-2 flex gap-2">
+          <input x-model="patientInput" @keydown.enter="sendPatient()" placeholder="Ask as patient..."
+                 class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm">
+          <button @click="sendPatient()" class="bg-blue-700 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold">Send</button>
+        </div>
+      </div>
+
+      <!-- Clinician Assist card -->
+      <div class="flex flex-col" style="flex: 1 1 50%">
+        <header class="px-4 py-2 bg-orange-950 border-b border-orange-800 flex items-center gap-2">
+          <span class="text-lg">🟧</span>
+          <h2 class="font-bold text-orange-200">Clinician Assist</h2>
+          <div class="ml-auto flex items-center gap-2">
+            <label class="text-xs text-orange-300">mode</label>
+            <select x-model="clinicianMode" class="bg-slate-800 text-slate-100 rounded px-2 py-0.5 text-xs border border-slate-600">
+              <option value="agentic">agentic</option>
+              <option value="batch">batch</option>
+              <option value="streaming">streaming</option>
+            </select>
+            <button @click="runSwarm()" :disabled="swarmRunning" class="text-xs px-2 py-0.5 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 rounded text-white font-semibold" title="Run 3 skills in parallel waves">
+              <span x-show="!swarmRunning">⚡ Swarm</span>
+              <span x-show="swarmRunning">…running</span>
+            </button>
+            <span class="text-xs text-slate-500 font-mono">product_id: clinician_summary</span>
+          </div>
+        </header>
+        <!-- Sample prompts (click to send) -->
+        <div class="bg-orange-950/40 border-b border-orange-900/60 px-3 py-2 flex flex-wrap gap-1.5">
+          <span class="text-xs text-orange-300/70 self-center mr-1">try:</span>
+          <template x-for="p in clinicianSamples" :key="p">
+            <button @click="useClinicianSample(p)"
+                    class="text-xs px-2 py-1 bg-orange-900/50 hover:bg-orange-700 text-orange-100 rounded border border-orange-800 transition"
+                    x-text="p"></button>
+          </template>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-3" x-ref="clinicianMessages">
+          <template x-for="m in clinicianChat" :key="m.id">
+            <div :class="m.role === 'user' ? 'text-right' : 'text-left'">
+              <div class="inline-block max-w-[90%] rounded-lg px-3 py-2 text-sm"
+                   :class="m.role === 'user' ? 'bg-orange-700 text-white' : 'bg-slate-700 text-slate-100'">
+                <div x-text="m.text" class="whitespace-pre-wrap"></div>
+              </div>
+            </div>
+          </template>
+          <div x-show="!clinicianChat.length" class="text-slate-500 text-sm italic">Start a clinician-assist conversation. Try: "summarise Patient 12's recent labs"</div>
+        </div>
+        <div class="border-t border-slate-700 p-2 flex gap-2">
+          <input x-model="clinicianInput" @keydown.enter="sendClinician()" placeholder="Ask as clinician..."
+                 class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm">
+          <button @click="sendClinician()" class="bg-orange-700 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm font-semibold">Send</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Inspector column -->
+    <aside class="overflow-y-auto bg-slate-950/50 p-3 space-y-3 text-xs">
+
+      <!-- 1. AIContext -->
+      <div class="bg-slate-800 rounded border border-slate-700 p-3">
+        <h3 class="text-teal-400 font-bold uppercase tracking-wider mb-2">1. AIContext</h3>
+        <div class="space-y-1 font-mono">
+          <div><span class="text-slate-500">tenant_id:</span> <span x-text="identity.tenant_id" class="text-slate-200"></span></div>
+          <div><span class="text-slate-500">user_id:</span> <span x-text="identity.user_id" class="text-slate-200"></span></div>
+          <div><span class="text-slate-500">session_id:</span> <span x-text="identity.session_id.substring(0,8)+'…'" class="text-slate-200"></span></div>
+          <div><span class="text-slate-500">validate():</span> <span class="text-green-400">✅</span></div>
+        </div>
+      </div>
+
+      <!-- 2. PromptManager -->
+      <div class="bg-slate-800 rounded border border-slate-700 p-3">
+        <h3 class="text-teal-400 font-bold uppercase tracking-wider mb-2">2. PromptManager</h3>
+        <div x-show="!lastInspector" class="text-slate-500 italic">No calls yet</div>
+        <div x-show="lastInspector" class="space-y-1 font-mono">
+          <div><span class="text-slate-500">prompt_id:</span> <span x-text="lastInspector && lastInspector.prompt_id"></span></div>
+          <div><span class="text-slate-500">version:</span> <span x-text="lastInspector && lastInspector.prompt_version"></span></div>
+          <div><span class="text-slate-500">cache TTL:</span> 30s</div>
+        </div>
+      </div>
+
+      <!-- 3. ToolRegistry -->
+      <div class="bg-slate-800 rounded border border-slate-700 p-3">
+        <h3 class="text-teal-400 font-bold uppercase tracking-wider mb-2">3. ToolRegistry</h3>
+        <div x-show="!lastInspector" class="text-slate-500 italic">No calls yet</div>
+        <div x-show="lastInspector" class="space-y-1 font-mono">
+          <div><span class="text-slate-500">available:</span> <span x-text="lastInspector && JSON.stringify(lastInspector.tools_available)"></span></div>
+          <div><span class="text-slate-500">called:</span> <span x-text="lastInspector && JSON.stringify(lastInspector.tools_called)" class="text-green-400"></span></div>
+        </div>
+      </div>
+
+      <!-- 4. SkillLoader -->
+      <div class="bg-slate-800 rounded border border-slate-700 p-3">
+        <h3 class="text-teal-400 font-bold uppercase tracking-wider mb-2">4. SkillLoader</h3>
+        <div x-show="!lastInspector" class="text-slate-500 italic">No calls yet</div>
+        <div x-show="lastInspector" class="space-y-1 font-mono">
+          <div><span class="text-slate-500">skill_ids:</span> <span x-text="lastInspector && JSON.stringify(lastInspector.skill_ids)"></span></div>
+        </div>
+      </div>
+
+      <!-- 5. CostCalculator -->
+      <div class="bg-slate-800 rounded border border-slate-700 p-3">
+        <h3 class="text-teal-400 font-bold uppercase tracking-wider mb-2">5. CostCalculator</h3>
+        <div x-show="!lastInspector" class="text-slate-500 italic">No calls yet</div>
+        <div x-show="lastInspector" class="space-y-1 font-mono">
+          <div><span class="text-slate-500">model:</span> <span x-text="lastInspector && shortModel(lastInspector.model_id)" class="text-yellow-300"></span></div>
+          <div><span class="text-slate-500">in / out:</span> <span x-text="lastInspector && lastInspector.input_tokens + ' / ' + lastInspector.output_tokens"></span></div>
+          <div><span class="text-slate-500">cost:</span> <span x-text="lastInspector && ('$' + lastInspector.cost_usd.toFixed(6))" class="text-green-400"></span></div>
+          <div><span class="text-slate-500">latency:</span> <span x-text="lastInspector && (lastInspector.latency_ms + 'ms')"></span></div>
+        </div>
+        <div class="mt-2 pt-2 border-t border-slate-700 flex items-center justify-between">
+          <span class="text-slate-500">session total:</span>
+          <span class="text-green-400 font-bold" x-text="'$' + sessionCost.toFixed(6)"></span>
+          <button @click="sessionCost=0" class="text-xs text-slate-500 hover:text-slate-200 ml-2">reset</button>
+        </div>
+      </div>
+
+      <!-- 6. UnifiedAICallLogger -->
+      <div class="bg-slate-800 rounded border border-slate-700 p-3">
+        <h3 class="text-teal-400 font-bold uppercase tracking-wider mb-2">6. UnifiedAICallLogger</h3>
+        <div x-show="!recentLog.length" class="text-slate-500 italic">No log entries yet</div>
+        <div class="space-y-1 font-mono max-h-48 overflow-y-auto">
+          <template x-for="entry in recentLog" :key="entry.call_id">
+            <div class="text-xs text-slate-400 border-b border-slate-800 py-1">
+              <span x-text="entry.prompt_id" class="text-teal-300"></span>
+              <span>·</span>
+              <span x-text="shortModel(entry.model_id)" class="text-yellow-300"></span>
+              <span>·</span>
+              <span x-text="'$' + entry.cost_usd.toFixed(6)" class="text-green-400"></span>
+              <span>·</span>
+              <span x-text="entry.latency_ms + 'ms'"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 7. Guardrail -->
+      <div class="bg-slate-800 rounded border border-slate-700 p-3">
+        <h3 class="text-teal-400 font-bold uppercase tracking-wider mb-2">🛡️ Guardrail</h3>
+        <div class="space-y-1 font-mono">
+          <div><span class="text-slate-500">id:</span> <span x-text="guardrailStatus" class="text-slate-200"></span></div>
+          <div x-show="lastInspector"><span class="text-slate-500">triggered:</span> <span x-text="lastInspector && (lastInspector.guardrail_triggered ? '⚠️ yes' : '✅ clean')"></span></div>
+        </div>
+      </div>
+
+      <!-- 8. SessionAgentStore (PP-03a) -->
+      <div class="bg-slate-800 rounded border border-slate-700 p-3">
+        <h3 class="text-teal-400 font-bold uppercase tracking-wider mb-2">8. SessionAgentStore</h3>
+        <div class="space-y-1 font-mono">
+          <div><span class="text-slate-500">state:</span> <span x-text="sessionInfo.state" :class="sessionInfo.state === 'warm' ? 'text-green-400' : 'text-slate-400'"></span></div>
+          <div><span class="text-slate-500">turns:</span> <span x-text="sessionInfo.turns" class="text-slate-200"></span></div>
+          <div><span class="text-slate-500">age:</span> <span x-text="sessionInfo.age_sec + 's'" class="text-slate-200"></span></div>
+          <div x-show="sessionInfo.message_count"><span class="text-slate-500">messages:</span> <span x-text="sessionInfo.message_count" class="text-slate-200"></span></div>
+        </div>
+        <div class="mt-2 pt-2 border-t border-slate-700 text-slate-500 text-xs italic">
+          patient_chat uses <code>chatbot_session</code> mode → turn 2 remembers turn 1
+        </div>
+      </div>
+
+      <!-- 9. SkillSwarm (PP-03c) -->
+      <div class="bg-slate-800 rounded border border-slate-700 p-3">
+        <h3 class="text-teal-400 font-bold uppercase tracking-wider mb-2">9. SkillSwarm</h3>
+        <div x-show="!swarmResult" class="text-slate-500 italic text-xs">Press the ⚡ Swarm button on the clinician card</div>
+        <div x-show="swarmResult && swarmResult.waves" class="space-y-2">
+          <div class="text-xs font-mono">
+            <span class="text-slate-500">total:</span>
+            <span x-text="swarmResult && swarmResult.total_elapsed_ms + 'ms'" class="text-slate-200"></span>
+            <span class="text-slate-500 ml-2">cost:</span>
+            <span x-text="swarmResult && swarmResult.totals && '$' + swarmResult.totals.cost_usd.toFixed(6)" class="text-green-400"></span>
+            <span class="text-slate-500 ml-2">calls:</span>
+            <span x-text="swarmResult && swarmResult.totals && swarmResult.totals.calls" class="text-slate-200"></span>
+          </div>
+          <template x-for="w in (swarmResult && swarmResult.waves) || []" :key="w.wave">
+            <div class="border-l-2 border-purple-600 pl-2 py-1">
+              <div class="text-xs">
+                <span class="text-purple-300 font-bold" x-text="'wave ' + w.wave"></span>
+                <span class="text-slate-500" x-text="' · ' + w.elapsed_ms + 'ms · '"></span>
+                <span class="text-slate-300 font-mono" x-text="w.skills.join(', ')"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 10. Tool Auto-Discovery (PP-03d) -->
+      <div class="bg-slate-800 rounded border border-slate-700 p-3">
+        <h3 class="text-teal-400 font-bold uppercase tracking-wider mb-2">🧰 Tool Auto-Discovery</h3>
+        <div x-show="!toolCatalog.length" class="text-slate-500 italic">loading…</div>
+        <div class="space-y-1 font-mono max-h-40 overflow-y-auto">
+          <template x-for="t in toolCatalog" :key="t.name">
+            <div class="text-xs border-b border-slate-800 py-1">
+              <span x-text="t.name" class="text-teal-300"></span>
+              <span class="text-slate-500 text-[10px]" x-text="' ← ' + (t.source || '').replace('app.middleware.tools.', '')"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Routing Table (compact) -->
+      <div class="bg-slate-800 rounded border border-slate-700 p-3">
+        <h3 class="text-teal-400 font-bold uppercase tracking-wider mb-2">🧭 Routing Table</h3>
+        <div x-show="!routing.length" class="text-slate-500 italic">loading…</div>
+        <div class="space-y-1">
+          <template x-for="r in routing" :key="r.product_id">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span x-text="r.product_id" class="text-slate-300"></span>
+              <span>→</span>
+              <span x-text="shortModel(r.model_id)" class="text-yellow-300"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </aside>
+  </main>
+
+</body>
+</html>
