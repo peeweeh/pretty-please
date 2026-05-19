@@ -1,7 +1,7 @@
 # Remote access via SSM port-forward
 
-The demo binds to `localhost:8000` on the sandbox EC2 (`i-00ce4ae955b4915f4`).
-The security group does **not** expose port 8000, so the easiest path from
+The demo binds to `localhost:9000` on the sandbox EC2 (`i-00ce4ae955b4915f4`).
+The security group does **not** expose port 9000, so the easiest path from
 another laptop is an SSM tunnel — no SG change required.
 
 ---
@@ -36,7 +36,7 @@ another laptop is an SSM tunnel — no SG change required.
 aws ssm start-session \
   --target i-00ce4ae955b4915f4 \
   --document-name AWS-StartPortForwardingSession \
-  --parameters '{"portNumber":["8000"],"localPortNumber":["8000"]}' \
+  --parameters '{"portNumber":["9000"],"localPortNumber":["9000"]}' \
   --region ap-southeast-1 \
   --profile eonar_dev003
 ```
@@ -44,7 +44,7 @@ aws ssm start-session \
 Leave that terminal open. Then on the laptop:
 
 ```
-http://localhost:8000
+http://localhost:9000
 ```
 
 Stop with `Ctrl+C`.
@@ -53,7 +53,7 @@ Stop with `Ctrl+C`.
 
 ## Make sure the demo is actually running on the EC2
 
-If `http://localhost:8000` returns nothing once the tunnel is up, the container
+If `http://localhost:9000` returns nothing once the tunnel is up, the container
 probably isn't running. From the EC2 (or via SSM RunShellScript):
 
 ```bash
@@ -80,7 +80,7 @@ aws ssm send-command \
   --document-name AWS-RunShellScript \
   --region ap-southeast-1 \
   --profile eonar_dev003 \
-  --parameters 'commands=["curl -sf -o /dev/null -w \"HTTP %{http_code}\\n\" http://localhost:8000/ || echo DOWN"]' \
+  --parameters 'commands=["curl -sf -o /dev/null -w \"HTTP %{http_code}\\n\" http://localhost:9000/ || echo DOWN"]' \
   --output json --no-cli-pager | jq -r '.Command.CommandId'
 
 # Then with that command id:
@@ -96,7 +96,7 @@ Expected: `HTTP 200`.
 
 ---
 
-## Alternative: open port 8000 in the SG (if SSM is overkill)
+## Alternative: open port 9000 in the SG (if SSM is overkill)
 
 Only do this if you actually want the public URL, e.g. for a demo to someone
 who doesn't have AWS access:
@@ -107,11 +107,11 @@ aws ec2 authorize-security-group-ingress \
   --region ap-southeast-1 \
   --profile eonar_dev003 \
   --group-name eonar-sandbox-ec2-sg \
-  --protocol tcp --port 8000 \
+  --protocol tcp --port 9000 \
   --cidr ${MYIP}/32
 ```
 
-Then use `http://52.220.182.114:8000`.
+Then use `http://52.220.182.114:9000`.
 
 Revoke afterwards:
 
@@ -120,7 +120,7 @@ aws ec2 revoke-security-group-ingress \
   --region ap-southeast-1 \
   --profile eonar_dev003 \
   --group-name eonar-sandbox-ec2-sg \
-  --protocol tcp --port 8000 \
+  --protocol tcp --port 9000 \
   --cidr ${MYIP}/32
 ```
 
@@ -134,5 +134,5 @@ aws ec2 revoke-security-group-ingress \
 | Region | `ap-southeast-1` |
 | Instance | `i-00ce4ae955b4915f4` (eonar sandbox EC2) |
 | EIP | `52.220.182.114` |
-| Container port | `8000` (host) → `8000` (container) |
+| Container port | `9000` (host) → `8000` (container) |
 | Repo path on EC2 | `/home/dev003/pretty-please` |

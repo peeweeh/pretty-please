@@ -14,7 +14,7 @@ Same LLM. Same prompts. Same 8 attacks. Two modes: **Vibe** (dangerous) and **Fo
 cp .env.example .env
 # set AWS_REGION=us-east-1 in .env (Bedrock via EC2 instance role)
 docker compose up
-open http://localhost:8000
+open http://localhost:9000
 ```
 
 Then pick an attack from the dropdown and toggle between Vibe and Fortress modes.

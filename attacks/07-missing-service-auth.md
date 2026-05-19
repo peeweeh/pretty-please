@@ -11,7 +11,7 @@ The Vibe mode MCP-style HTTP endpoints at `/mcp-vibe/{tool_name}` have no authen
 
 ```bash
 # No LLM. No session. No login. Just curl.
-curl -X POST localhost:8000/mcp-vibe/get_patient_labs \
+curl -X POST localhost:9000/mcp-vibe/get_patient_labs \
   -H "Content-Type: application/json" \
   -d '{"patient_id": 12}'
 ```
