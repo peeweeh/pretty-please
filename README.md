@@ -19,6 +19,13 @@ open http://localhost:9000
 
 Then pick an attack from the dropdown and toggle between Vibe and Fortress modes.
 
+For the unified **Summit 2.0** demo (4 acts: vibe-coded → fix ladder →
+traced → content guard), go to `/summit2/` instead, and see
+[`docs/HOW-IT-WORKS.md`](docs/HOW-IT-WORKS.md) for setup + architecture,
+[`docs/STORY.md`](docs/STORY.md) for the 15-minute talk script, and
+[`docs/DEMO-DETAIL.md`](docs/DEMO-DETAIL.md) for the deep technical dive
+per attack.
+
 ---
 
 ## The thesis

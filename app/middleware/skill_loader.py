@@ -1,6 +1,6 @@
 """
 SkillLoader — resolves skill dependencies and stitches instructions into the
-system prompt. Mirrors eonar-mono/backend/ai_middleware/skill_loader.py.
+system prompt.
 """
 
 import json

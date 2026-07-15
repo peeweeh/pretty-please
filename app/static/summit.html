@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Summit Demo — AI Middleware on Bedrock</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/tailwind-cdn.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -12,7 +12,7 @@
     }
   </script>
   <script src="/static/summit.js?v=4"></script>
-  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <script src="/static/alpine.min.js" defer></script>
   <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col" x-data="summitApp()" x-init="init()">
@@ -22,7 +22,7 @@
     <h1 class="text-lg font-bold">MediMind Health</h1>
     <nav class="flex items-center gap-2 ml-4 text-sm">
       <a href="/" class="px-3 py-1 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-700">DEFCON Demo</a>
-      <a href="/summit" class="px-3 py-1 rounded bg-teal-700 text-white font-semibold">Summit Demo</a>
+      <a href="/summit2" class="px-3 py-1 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-700">Summit 2.0</a>
       <a href="/how-it-works" class="px-3 py-1 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-700">How it Works</a>
     </nav>
     <span class="ml-auto text-xs text-slate-500 italic">One Guardrails Config, Every Model Call — AI Middleware on Bedrock</span>

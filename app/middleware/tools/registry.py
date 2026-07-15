@@ -1,8 +1,7 @@
 """
 ToolRegistry — @tool decorator + discovery.
-Port of eonar-mono/backend/ai_middleware/tools/registry.py (trimmed).
 
-The "two-step gotcha" from the project's user memory lives here:
+The "two-step gotcha" worth remembering lives here:
 registering a function via @tool is NOT enough — the prompt's tool_ids
 list in DynamoDB/SQLite controls which tools actually get offered to
 the model at runtime. That's a feature, not a bug — it lets the same

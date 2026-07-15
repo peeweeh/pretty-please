@@ -1,6 +1,5 @@
 """
 CostCalculator — Bedrock per-token pricing.
-Lifted from eonar-mono/backend/ai_middleware/cost_calculator.py.
 Prices per 1K tokens in USD. Last checked: Nov 2025.
 """
 

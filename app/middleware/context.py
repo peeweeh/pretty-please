@@ -1,6 +1,5 @@
 """
 AIContext — scoped request context for the middleware demo.
-Port of eonar-mono/backend/ai_middleware/context.py.
 """
 
 from dataclasses import dataclass

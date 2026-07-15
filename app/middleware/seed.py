@@ -2,8 +2,8 @@
 Summit demo seed data — prompts, skills, routing.
 Lives alongside DEFCON seed_data.py but kept separate to avoid touching it.
 
-Shape matches eonar-mono/backend/ai_middleware/skills_cache.json and
-the DynamoDB schemas for eonar-prompts-{env} / eonar-skills-{env}.
+Shape matches a typical prod skills-cache JSON and per-environment
+DynamoDB prompt/skill table naming convention.
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ PROMPTS = [
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SKILLS — composable instruction fragments (same shape as eonar skills_cache.json)
+# SKILLS — composable instruction fragments (same shape as the skills-cache JSON above)
 #   (skill_id, name, description, instructions, tags JSON, dependencies JSON,
 #    inject_full, status, version)
 # ─────────────────────────────────────────────────────────────────────────────

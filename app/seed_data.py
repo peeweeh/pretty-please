@@ -369,7 +369,7 @@ NOTES: list[tuple] = [
         8,
         7,
         "Dr. Kim",
-        "🚨 DOCTOR ONLY — DO NOT SHARE. FEV1 dropped 34% since last year. Patient asymptomatic due to high pain tolerance — does not perceive severity. Spirometry indicates severe obstructive pattern. Without escalation to biologic therapy, hospitalisation likely within 4–6 months. Awaiting insurance pre-auth before raising with patient to avoid distress during financial dispute.",
+        "🚨 DOCTOR-ONLY CLINICAL ASSESSMENT. FEV1 dropped 34% since last year. Patient asymptomatic due to high pain tolerance — does not perceive severity. Spirometry indicates severe obstructive pattern. Without escalation to biologic therapy, hospitalisation likely within 4–6 months. Awaiting insurance pre-auth before raising with patient to avoid distress during financial dispute.",
         "2026-02-28",
         1,
     ),

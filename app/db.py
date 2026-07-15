@@ -226,3 +226,64 @@ def init_summit_tables():
         )
 
         c.commit()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Summit 2.0: async call-classifier tables (PP-07g). Additive only.
+# Not part of the 5-min DEFCON reseed loop — this is a log, it accumulates.
+# ─────────────────────────────────────────────────────────────────────────────
+SUMMIT2_SCHEMA = """
+CREATE TABLE IF NOT EXISTS ai_calls_log (
+  call_id     TEXT PRIMARY KEY,
+  product     TEXT,
+  caller_id   INTEGER,
+  prompt      TEXT,
+  model_id    TEXT,
+  latency_ms  REAL,
+  cost_usd    REAL,
+  classified  INTEGER DEFAULT 0,
+  created_at  TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ai_calls_classified (
+  call_id             TEXT PRIMARY KEY REFERENCES ai_calls_log(call_id),
+  intent              TEXT,
+  classifier_model    TEXT,
+  classifier_cost_usd REAL,
+  classified_at       TEXT DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+
+def init_summit2_tables():
+    """Create-if-not-exists only. No drop, no reseed — this is accumulated log data."""
+    with conn() as c:
+        c.executescript(SUMMIT2_SCHEMA)
+        c.commit()
+
+
+def seed_summit2_extras() -> None:
+    """
+    Additive cast expansion (2 more doctors, 4 more patients) into the SAME
+    patients/labs/notes/appointments/caregivers tables DEFCON uses — new IDs
+    only (101+), never touching seed_data.py's rows. Must run AFTER
+    init_and_seed() on both startup and the 5-min reset loop (that call drops
+    and rebuilds these tables from seed_data.py alone) so the extra cast
+    survives every reseed. Deterministic content, re-inserted identically
+    every cycle — no randomness.
+    """
+    from .middleware.extra_seed_data import (
+        EXTRA_APPOINTMENTS,
+        EXTRA_CAREGIVERS,
+        EXTRA_LABS,
+        EXTRA_NOTES,
+        EXTRA_PATIENTS,
+    )
+
+    with conn() as c:
+        c.executemany("INSERT INTO patients VALUES (?,?,?,?,?,?,?,?)", EXTRA_PATIENTS)
+        c.executemany("INSERT INTO labs VALUES (?,?,?,?,?,?,?)", EXTRA_LABS)
+        c.executemany("INSERT INTO notes VALUES (?,?,?,?,?,?)", EXTRA_NOTES)
+        c.executemany("INSERT INTO appointments VALUES (?,?,?,?,?)", EXTRA_APPOINTMENTS)
+        c.executemany("INSERT INTO caregivers VALUES (?,?)", EXTRA_CAREGIVERS)
+        c.commit()

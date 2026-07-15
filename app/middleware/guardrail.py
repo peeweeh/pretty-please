@@ -1,6 +1,5 @@
 """
 Guardrail — Bedrock Guardrails config applied to every converse() call.
-Port of eonar-mono/backend/ai_middleware/guardrail.py (6-liner).
 
 In prod this calls Bedrock with a real guardrailIdentifier. In the demo
 we return the config dict so the orchestrator can merge it in — and the

@@ -1,6 +1,6 @@
 """
 PromptManager — SQLite-backed prompt lookup with short TTL cache.
-Port of eonar-mono/backend/ai_middleware/prompts/manager.py (trimmed).
+Same pattern real-world versioned-prompt middleware uses, trimmed for the demo.
 """
 
 import json

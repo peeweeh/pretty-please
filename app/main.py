@@ -23,10 +23,12 @@ from .audit import (
     unregister_audit_queue,
     write_and_broadcast,
 )
-from .db import conn, init_and_seed, init_summit_tables
+from .db import conn, init_and_seed, init_summit2_tables, init_summit_tables, seed_summit2_extras
 from .guardrails import AuthzError
+from .middleware.call_classifier import poll_loop as classifier_poll_loop
 from .prompts import VIBE_SYSTEM, get_fortress_prompt, get_guardrails_prompt
 from .routes_summit import router as summit_router
+from .routes_summit2 import router as summit2_router
 from .tools_fortress import call as fortress_call
 from .tools_fortress import get_schemas_for_caller
 from .tools_vibe import TOOL_SCHEMAS as VIBE_SCHEMAS
@@ -63,6 +65,7 @@ class _DemoLogHandler(logging.Handler):
 
 app = FastAPI(title="pretty-please — MediMind Health Demo")
 app.include_router(summit_router)
+app.include_router(summit2_router)
 
 # ── Static files ────────────────────────────────────────────────────────────
 _static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -90,7 +93,9 @@ def health():
 @app.on_event("startup")
 async def startup():
     init_and_seed()
+    seed_summit2_extras()
     init_summit_tables()
+    init_summit2_tables()
     # Register the demo log handler on the root logger
     _handler = _DemoLogHandler()
     logging.getLogger().addHandler(_handler)
@@ -98,6 +103,7 @@ async def startup():
     logger.info("DB seeded. Starting reset loop.")
     interval = int(os.environ.get("DB_RESET_INTERVAL", "300"))
     asyncio.create_task(_reset_loop(interval))
+    asyncio.create_task(classifier_poll_loop())
 
 
 async def _reset_loop(interval: int):
@@ -105,6 +111,7 @@ async def _reset_loop(interval: int):
         await asyncio.sleep(interval)
         logger.info("Auto-reseed triggered.")
         init_and_seed()
+        seed_summit2_extras()
         init_summit_tables()
 
 

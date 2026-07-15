@@ -1,6 +1,5 @@
 """
 UnifiedAICallLogger — one log record per model call.
-Port of eonar-mono/backend/ai_middleware/unified_logger.py.
 Writes to stdout (for CloudWatch parity) and SQLite (for the demo inspector).
 """
 

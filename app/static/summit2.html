@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Summit 2.0 — Vibe-Coding Agents Will Mess You Up</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400;0,600;0,700;1,400&family=Fira+Code:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
+  <script src="/static/tailwind-cdn.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Arimo', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['"Fira Code"', 'ui-monospace', 'monospace'],
+          },
+          colors: {
+            base: '#1E2628',      // page background (deeper than surface)
+            surface: '#2C3639',   // header / card background
+            surface2: '#3F4E4F',  // nested / hover surface
+            line: '#3F4E4F',      // borders
+            accent: '#A27B5C',    // neutral secondary accent
+            cream: '#DCD7C9',     // primary light text on dark
+            pop: '#F2613F',       // primary CTA / active state
+            popdark: '#481E14',   // pressed / deep accent
+            rust: '#9B3922',      // secondary warm accent
+            safe: '#607456',      // allowed / passed
+            warn: '#BA6A4C',      // caution / secondary warning
+            danger: '#7B2525',    // blocked / leaked
+            sand: '#EEE0CC',      // warm highlight text
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/marked.min.js"></script>
+  <script src="/static/summit2.js?v=7"></script>
+  <script src="/static/alpine.min.js" defer></script>
+  <style>
+    .msi {
+      font-family: 'Material Symbols Outlined';
+      font-weight: normal;
+      font-style: normal;
+      line-height: 1;
+      vertical-align: middle;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-feature-settings: 'liga';
+      font-feature-settings: 'liga';
+      -webkit-font-smoothing: antialiased;
+      color: inherit; /* never let the icon default to black on a dark bg */
+    }
+    @keyframes think-pulse {
+      0%, 100% { opacity: 0.35; transform: scale(0.85); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+    .think-dot { animation: think-pulse 1s ease-in-out infinite; }
+    .think-dot:nth-child(2) { animation-delay: 0.15s; }
+    .think-dot:nth-child(3) { animation-delay: 0.3s; }
+  </style>
+</head>
+<body class="bg-base text-cream h-screen overflow-hidden flex flex-col text-lg font-sans" x-data="summit2App()" x-init="init()">
+
+  <!-- Top nav + persistent identity badge (PP-07e) -->
+  <header class="bg-surface border-b border-line px-6 py-2 flex items-center gap-6 flex-wrap">
+    <h1 class="text-xl font-bold flex items-center gap-2"><span class="msi text-xl text-pop">local_hospital</span> MediMind Health</h1>
+    <nav class="flex items-center gap-3">
+      <a href="/" class="px-4 py-1.5 rounded-lg text-base text-cream/60 hover:text-cream hover:bg-surface2">DEFCON Demo</a>
+      <a href="/summit2" class="px-4 py-1.5 rounded-lg text-base bg-pop text-white font-semibold">Summit 2.0</a>
+    </nav>
+    <div class="ml-auto flex items-center gap-3">
+      <div class="flex items-center gap-3 bg-base border border-line rounded-full px-4 py-1.5">
+        <span class="text-base text-cream/50">acting as</span>
+        <select x-model.number="callerId" @change="onCallerChange()" class="bg-transparent text-accent text-lg font-semibold">
+          <template x-for="p in cast" :key="p.id">
+            <option :value="p.id" x-text="p.name + ' (' + p.role + ')'"></option>
+          </template>
+        </select>
+        <span class="text-cream/30">·</span>
+        <span class="text-base text-cream/50">patient ID</span>
+        <span class="text-3xl font-bold text-pop font-mono leading-none" x-text="callerId"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Act tabs -->
+  <div class="bg-surface/60 border-b border-line px-6 py-2 flex items-center gap-3 flex-wrap">
+    <template x-for="n in [1,2,3,4]" :key="n">
+      <button @click="act = n; recallMemory()"
+              class="px-4 py-1.5 rounded-full font-semibold text-lg transition"
+              :class="act === n ? 'bg-pop text-white' : 'bg-surface2 text-cream/50 hover:text-cream'">
+        <span x-text="n === 1 ? '① Vibe-coded' : n === 2 ? '② Fix it, cheapest first' : n === 3 ? '③ Fast + traced' : '④ Content guard'"></span>
+      </button>
+    </template>
+    <span class="ml-auto text-lg text-cream/50 italic hidden lg:inline" x-text="actTagline"></span>
+  </div>
+
+  <main class="flex-1 min-h-0 grid grid-cols-[1fr_630px] gap-0 overflow-hidden">
+    <section class="flex flex-col overflow-hidden p-5 gap-4">
+
+      <!-- Bundle / demo selector (Act 1 and 2) -->
+      <div x-show="act===1" class="flex flex-wrap gap-3">
+        <template x-for="b in bundles" :key="b.id">
+          <button @click="selectedAttackBundle = b"
+                  class="text-lg px-4 py-2.5 rounded-lg border-2 transition font-semibold"
+                  :class="selectedAttackBundle && selectedAttackBundle.id === b.id ? 'bg-pop border-pop text-white' : 'bg-surface border-line text-cream/70 hover:border-accent'">
+            <span x-text="b.id + '. ' + b.title"></span>
+          </button>
+        </template>
+      </div>
+      <div x-show="act===2" class="flex flex-wrap gap-3">
+        <template x-for="fb in fixBundles" :key="fb.id">
+          <button @click="selectedFixBundle = fb"
+                  class="text-lg px-4 py-2.5 rounded-lg border-2 transition font-semibold"
+                  :class="selectedFixBundle && selectedFixBundle.id === fb.id ? 'bg-pop border-pop text-white' : 'bg-surface border-line text-cream/70 hover:border-accent'">
+            <span x-text="fb.label"></span>
+            <span class="text-cream/40" x-text="' (' + fb.difficulty + ')'"></span>
+          </button>
+        </template>
+      </div>
+
+      <!-- ACT 1 detail -->
+      <div x-show="act===1 && selectedAttackBundle" class="bg-surface border border-line rounded-xl p-4 space-y-3 shrink-0 max-h-[38vh] overflow-y-auto">
+        <div class="flex flex-wrap gap-2">
+          <template x-for="a in (selectedAttackBundle ? selectedAttackBundle.attacks : [])" :key="a.num">
+            <button x-show="a.prompt" @click="a.num === 5 ? runLeakDemo() : runQuickPrompt(a.prompt, a.caller_id)"
+                    :title="a.prompt"
+                    class="text-lg px-4 py-2.5 rounded-lg border-2 border-danger bg-danger/20 hover:bg-danger/40 transition font-semibold">
+              <span class="text-pop" x-text="'#' + a.num"></span> <span x-text="a.name"></span>
+            </button>
+            <div x-show="!a.prompt" class="w-full text-base text-cream/40 italic px-2 py-2" x-text="'#' + a.num + ' ' + a.name + ' — ' + (a.note || '')"></div>
+          </template>
+        </div>
+        <div x-show="selectedAttackBundle && selectedAttackBundle.attacks.some(a => a.note && a.prompt)" class="text-base text-warn italic">
+          <template x-for="a in (selectedAttackBundle ? selectedAttackBundle.attacks : [])" :key="'note-'+a.num">
+            <p x-show="a.note && a.prompt" x-text="a.note"></p>
+          </template>
+        </div>
+        <button x-show="selectedAttackBundle && selectedAttackBundle.contrast"
+                @click="runQuickPrompt(selectedAttackBundle.contrast.prompt, selectedAttackBundle.contrast.caller_id)"
+                class="text-lg px-4 py-2.5 bg-safe/20 hover:bg-safe/40 border border-safe rounded-lg transition text-left w-full flex items-center gap-2">
+          <span class="msi text-safe">check_circle</span>
+          <span class="text-cream/90" x-text="selectedAttackBundle && selectedAttackBundle.contrast.label"></span>
+        </button>
+      </div>
+
+      <!-- ACT 2 detail -->
+      <div x-show="act===2 && selectedFixBundle" class="bg-surface border border-line rounded-xl p-4 space-y-3 shrink-0 max-h-[38vh] overflow-y-auto">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-base text-cream/50">layers active (cumulative):</span>
+          <template x-for="l in cumulativeLayers(selectedFixBundle)" :key="l">
+            <span class="px-3 py-1 rounded-full bg-accent/30 text-sand text-base font-mono" x-text="l + ' ' + (layerInfo[l] ? layerInfo[l].name : '')"></span>
+          </template>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <template x-for="p in samplePromptsFor(selectedFixBundle)" :key="p">
+            <button @click="runQuickPrompt(p, callerId)" class="text-lg px-4 py-2.5 bg-base border border-line rounded-lg hover:border-accent" x-text="p"></button>
+          </template>
+        </div>
+        <div x-show="selectedFixBundle && selectedFixBundle.id === 2" class="text-base bg-warn/15 border border-warn rounded-lg px-3 py-2 text-warn">
+          Tested live against 10 Bedrock models with the real tool surface — none reliably fire this exact
+          payload. The structural demo below proves L5 works regardless of model mood.
+          <button @click="showNotesPreview()" class="mt-2 px-3 py-1.5 bg-base border border-line rounded-lg hover:border-accent text-cream flex items-center gap-1.5">
+            show note content as the model sees it <span class="msi text-base">arrow_forward</span>
+          </button>
+          <pre x-show="notesPreview" class="mt-2 bg-base rounded-lg p-3 overflow-x-auto text-cream/80 whitespace-pre-wrap text-base font-mono" x-text="notesPreview"></pre>
+        </div>
+        <div x-show="selectedFixBundle && cumulativeLayers(selectedFixBundle).includes('L1')" class="text-base space-y-1">
+          <p class="text-cream/60">L1 — try it via curl (no LLM), signed token fetched live:</p>
+          <pre class="bg-base rounded-lg p-3 overflow-x-auto text-cream/80 font-mono" x-text="curlUnsigned"></pre>
+          <pre class="bg-base rounded-lg p-3 overflow-x-auto text-cream/80 font-mono" x-text="curlSigned"></pre>
+        </div>
+      </div>
+
+      <!-- ACT 3 detail -->
+      <div x-show="act===3" class="bg-surface border border-pop/50 rounded-xl p-4 space-y-3">
+        <h3 class="text-2xl font-bold text-pop">Same stack. Now fast + observable.</h3>
+        <div class="flex flex-wrap gap-2">
+          <template x-for="p in act3Prompts" :key="p">
+            <button @click="runQuickPrompt(p, callerId)" class="text-lg px-4 py-2.5 bg-base border border-line rounded-lg hover:border-accent" x-text="p"></button>
+          </template>
+        </div>
+        <div class="text-lg text-cream/70" x-show="lastLatencyMs">
+          latency: <span x-text="lastLatencyMs + 'ms'" class="text-sand font-mono"></span>
+          · cost: <span x-text="'$' + lastCostUsd" class="text-safe font-mono"></span>
+        </div>
+      </div>
+
+      <!-- ACT 4 detail — SUMMIT-05: Trend Vision One AI Guard -->
+      <div x-show="act===4" class="bg-surface border border-line rounded-xl p-4 space-y-3 shrink-0 max-h-[38vh] overflow-y-auto">
+        <h3 class="text-2xl font-bold text-accent">Architecture can't read what you typed.</h3>
+        <div x-show="!aiguardEnabled" class="text-base bg-warn/15 border border-warn rounded-lg px-3 py-2 text-warn">
+          <span class="msi text-base align-middle">warning</span>
+          V1_API_KEY not set — this demo is disabled until it's configured.
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <template x-for="c in aiguardCatalogue" :key="c.category">
+            <button @click="runQuickPrompt(c.prompt, callerId, true)"
+                    :title="c.prompt"
+                    class="text-lg px-4 py-2.5 rounded-lg border-2 transition font-semibold"
+                    :class="c.category === 'Benign' ? 'border-safe bg-safe/15 hover:bg-safe/30' : 'border-danger bg-danger/15 hover:bg-danger/30'">
+              <span :class="c.category === 'Benign' ? 'text-safe' : 'text-pop'" x-text="c.category"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <!-- Shared chat transcript (all 3 acts) — fixed height, its OWN scrollbar,
+           so growth never pushes the page or the bundle selector out of view. -->
+      <div class="bg-surface border border-line rounded-xl p-4 flex flex-col flex-1 min-h-[220px]">
+        <div class="flex-1 min-h-0 overflow-y-auto space-y-3 mb-3" x-ref="chatLog">
+          <template x-for="m in chatLog" :key="m.id">
+            <div :class="m.role === 'user' ? 'text-right' : 'text-left'">
+              <div class="inline-block max-w-[90%] rounded-xl px-4 py-3 text-xl"
+                   :class="m.role === 'user' ? 'bg-pop/80 text-white' : (m.blocked ? 'bg-danger/30 border-2 border-danger' : 'bg-surface2')">
+                <div x-show="m.role === 'user'" x-text="m.text" class="whitespace-pre-wrap"></div>
+                <div x-show="m.role !== 'user'" x-html="renderMarkdown(m.text)" class="md-content"></div>
+                <div x-show="m.visibilityBadges && m.visibilityBadges.length" class="mt-2 flex flex-wrap gap-2">
+                  <template x-for="v in (m.visibilityBadges || [])" :key="v.author + v.visibility">
+                    <span class="text-sm font-mono px-2 py-1 rounded-full flex items-center gap-1"
+                          :class="(v.visibility||'').includes('Doctor only') ? 'bg-warn/30 text-warn' : 'bg-safe/30 text-safe'">
+                      <span class="msi text-sm" x-text="(v.visibility||'').includes('Doctor only') ? 'lock' : 'group'"></span>
+                      <span x-text="(v.author || '?') + ': ' + (v.visibility || '')"></span>
+                    </span>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+          <div x-show="isThinking" class="text-left">
+            <div class="inline-block max-w-[90%] rounded-xl px-4 py-3 text-xl bg-surface2 flex items-center gap-3">
+              <span class="flex gap-1">
+                <span class="think-dot w-2 h-2 rounded-full bg-accent inline-block"></span>
+                <span class="think-dot w-2 h-2 rounded-full bg-accent inline-block"></span>
+                <span class="think-dot w-2 h-2 rounded-full bg-accent inline-block"></span>
+              </span>
+              <span class="text-cream/60 italic" x-text="thinkingWord"></span>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <input x-model="chatInput" @keydown.enter="sendChat()" placeholder="Ask Mira anything..."
+                 class="flex-1 bg-base border border-line rounded-lg px-4 py-3 text-lg text-cream placeholder:text-cream/30">
+          <button @click="sendChat()" class="bg-pop hover:bg-rust text-white px-6 py-3 rounded-lg text-lg font-semibold">Send</button>
+          <button @click="recallMemory()" class="bg-surface2 hover:bg-line text-cream px-4 py-3 rounded-lg text-base flex items-center gap-1.5" title="Query memory manually">
+            <span class="msi text-base">refresh</span> recall
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Inspector column — same three panels on every act, always live -->
+    <aside class="overflow-y-auto bg-base p-4 space-y-4 border-l border-line">
+
+      <div class="bg-surface rounded-xl border border-line p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sand font-bold uppercase tracking-wider text-base flex items-center gap-1.5">
+            <span class="msi text-lg">search</span> Agent Activity
+          </h3>
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-cream/40" x-text="toolCallTrace.length + ' tool calls'"></span>
+            <button @click="toolCallTrace = []" class="text-sm text-cream/40 hover:text-cream">clear</button>
+          </div>
+        </div>
+        <div x-show="!toolCallTrace.length" class="text-cream/40 italic text-base text-center py-4">No tool calls yet. Start a chat to see agent activity.</div>
+        <div class="space-y-2">
+          <template x-for="(tc, i) in toolCallTrace" :key="i">
+            <div class="border-l-4 rounded-r-lg p-3 bg-base/60 cursor-pointer" :class="badgeFor(tc).border" @click="tc.expanded = !tc.expanded">
+              <!-- Header row -->
+              <div class="flex items-start justify-between gap-2">
+                <code class="text-base font-bold font-mono" :class="badgeFor(tc).text" x-text="tc.tool"></code>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span class="text-sm text-cream/40 font-mono" x-text="(tc.duration_ms ?? 0) + 'ms'"></span>
+                  <span class="text-sm px-2 py-0.5 rounded font-semibold whitespace-nowrap flex items-center gap-1" :class="badgeFor(tc).bg">
+                    <span class="msi text-sm" x-text="badgeFor(tc).icon"></span>
+                    <span x-text="badgeFor(tc).label"></span>
+                  </span>
+                  <span class="msi text-sm text-cream/40" x-text="tc.expanded ? 'expand_less' : 'expand_more'"></span>
+                </div>
+              </div>
+
+              <!-- Collapsed -->
+              <div x-show="!tc.expanded" class="mt-1">
+                <code class="text-sm text-cream/50 font-mono" x-text="JSON.stringify(tc.args)"></code>
+              </div>
+              <div x-show="!tc.expanded && tc.blocked" class="mt-0.5 text-sm font-semibold text-accent" x-text="tc.reason"></div>
+
+              <!-- Expanded -->
+              <div x-show="tc.expanded" class="mt-3 space-y-3" @click.stop>
+                <div>
+                  <div class="text-sm font-semibold text-cream/40 uppercase tracking-wider mb-1">Decision</div>
+                  <div class="text-sm px-2 py-1 rounded" :class="tc.blocked ? 'bg-accent/25 text-accent' : 'bg-safe/25 text-safe'" x-text="decisionText(tc)"></div>
+                </div>
+                <div>
+                  <div class="text-sm font-semibold text-cream/40 uppercase tracking-wider mb-1">Arguments</div>
+                  <pre class="text-sm text-cream/80 bg-base rounded p-2 overflow-x-auto font-mono" x-text="JSON.stringify(tc.args, null, 2)"></pre>
+                </div>
+                <div x-show="tc.result !== undefined">
+                  <div class="text-sm font-semibold uppercase tracking-wider mb-1" :class="tc.blocked ? 'text-accent' : 'text-cream/40'">
+                    <span x-text="tc.blocked ? 'Engine Rejection' : 'Result'"></span>
+                  </div>
+                  <pre class="text-sm rounded p-2 overflow-x-auto font-mono" :class="tc.blocked ? 'text-accent bg-accent/15 border border-accent' : 'text-cream/80 bg-base'" x-text="JSON.stringify(tc.result, null, 2)"></pre>
+                </div>
+                <div x-show="tc.thinking">
+                  <div class="text-sm font-semibold text-accent uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <span class="msi text-base">psychology</span> AI Reasoning
+                  </div>
+                  <div class="text-sm text-cream/80 bg-base rounded p-2 border-l-2 border-accent whitespace-pre-wrap" x-text="tc.thinking"></div>
+                </div>
+                <div x-show="tc.trace && tc.trace.length">
+                  <div class="text-sm font-semibold text-accent uppercase tracking-wider mb-1">Layer pipeline</div>
+                  <div class="flex flex-wrap gap-1.5">
+                    <template x-for="step in (tc.trace || [])" :key="step.layer">
+                      <span class="text-sm px-1.5 py-0.5 rounded font-mono"
+                            :class="step.outcome === 'blocked' ? 'bg-danger/30 text-pop' : step.outcome === 'pass' ? 'bg-safe/25 text-safe' : 'bg-surface2 text-cream/40'"
+                            :title="step.name + (step.detail ? ': ' + step.detail : '')"
+                            x-text="step.layer + ':' + step.outcome"></span>
+                    </template>
+                  </div>
+                </div>
+                <div class="text-sm text-cream/30" x-text="tc.ts + ' · act ' + tc.act"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- AI Guard meter — SUMMIT-05. Shows once there's data, any act, same
+           precedent as the Layer pipeline panel below (data-conditional, not act-locked). -->
+      <div class="bg-surface rounded-xl border border-line p-4" x-show="aiguardStats.total > 0">
+        <h3 class="text-sand font-bold uppercase tracking-wider mb-3 text-base flex items-center gap-1.5">
+          <span class="msi text-lg">shield</span> AI Guard meter
+        </h3>
+        <div class="w-full h-3 rounded-full bg-danger/25 overflow-hidden mb-2">
+          <div class="h-full bg-safe" :style="'width: ' + aiguardStats.allowedPct + '%'"></div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div>
+            <div class="text-2xl font-bold text-safe" x-text="aiguardStats.allowed"></div>
+            <div class="text-sm text-cream/40">allowed</div>
+          </div>
+          <div>
+            <div class="text-2xl font-bold text-pop" x-text="aiguardStats.blocked"></div>
+            <div class="text-sm text-cream/40">blocked</div>
+          </div>
+          <div>
+            <div class="text-2xl font-bold text-cream" x-text="aiguardStats.total"></div>
+            <div class="text-sm text-cream/40">checked</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-surface rounded-xl border border-line p-4">
+        <h3 class="text-sand font-bold uppercase tracking-wider mb-3 text-base flex items-center gap-1.5">
+          <span class="msi text-lg">memory</span> Memory
+        </h3>
+        <div class="text-cream/60 text-base font-mono" x-text="recallResult ? JSON.stringify(recallResult.memory) : 'not queried yet'"></div>
+        <p class="text-sm text-cream/30 mt-1" x-text="'scoped: ' + (memoryLayersLabel)"></p>
+      </div>
+
+      <!-- Classifier — redesigned -->
+      <div class="bg-surface rounded-xl border border-line p-4">
+        <h3 class="text-sand font-bold uppercase tracking-wider mb-3 text-base flex items-center gap-1.5">
+          <span class="msi text-lg">smart_toy</span> Async Call Classifier
+        </h3>
+        <p class="text-sm text-cream/40 mb-3">A second, cheap model reads every call ~5s later and tags it by topic — like OpenRouter's usage analytics, self-hosted. Zero added latency on the request that already returned.</p>
+        <div class="flex items-center justify-between text-base mb-3 bg-base rounded-lg px-3 py-2">
+          <span class="font-mono text-sand" x-text="classifier.classifier_model"></span>
+          <span class="text-cream/50" x-text="'polls every ' + classifier.poll_interval_seconds + 's'"></span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <div class="bg-base rounded-lg px-3 py-2 text-center">
+            <div class="text-2xl font-bold text-cream" x-text="classifier.pending"></div>
+            <div class="text-sm text-cream/40">pending</div>
+          </div>
+          <div class="bg-base rounded-lg px-3 py-2 text-center">
+            <div class="text-2xl font-bold text-safe" x-text="'$' + classifier.total_classifier_cost_usd"></div>
+            <div class="text-sm text-cream/40">total classifier spend</div>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <template x-for="r in classifier.recent" :key="r.call_id">
+            <div class="flex items-center justify-between bg-base rounded-lg px-3 py-2">
+              <span class="px-2.5 py-1 rounded-full text-sm font-semibold" :class="intentColor(r.intent)" x-text="r.intent"></span>
+              <span class="text-sm text-cream/40 font-mono" x-text="'P' + r.caller_id + ' · $' + r.classifier_cost_usd.toFixed(6)"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Layer pipeline — the auth-then-multiple-layers trace DEFCON's docs
+           describe (L1..L9), now shown as an actual step-by-step flow. -->
+      <div class="bg-surface rounded-xl border border-line p-4" x-show="lastTrace.length">
+        <h3 class="text-sand font-bold uppercase tracking-wider mb-3 text-base flex items-center gap-1.5">
+          <span class="msi text-lg">route</span> Layer pipeline (last call)
+        </h3>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <template x-for="(step, i) in lastTrace" :key="step.layer">
+            <div class="flex items-center gap-1.5">
+              <div class="px-2.5 py-1.5 rounded-lg text-sm font-mono text-center"
+                   :class="step.outcome === 'blocked' ? 'bg-danger/25 text-pop border border-danger' : step.outcome === 'pass' ? 'bg-safe/25 text-safe border border-safe' : 'bg-base text-cream/40 border border-line'"
+                   :title="step.name">
+                <div x-text="step.layer" class="font-bold"></div>
+                <div class="text-[11px]" x-text="step.outcome"></div>
+              </div>
+              <span x-show="i < lastTrace.length - 1" class="msi text-cream/30 text-base">arrow_forward</span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </aside>
+  </main>
+
+</body>
+</html>

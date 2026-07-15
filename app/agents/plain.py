@@ -70,6 +70,7 @@ async def run(
     tool_schemas: list[dict],
     dispatch_fn: Callable[[str, dict], Any],
     emit_audit: Callable[..., None],
+    model_id: str | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Async generator yielding SSE-friendly events:
@@ -77,8 +78,12 @@ async def run(
       {"type": "thinking", "delta": "..."}
       {"type": "tokens",   "input": N, "output": N}
       {"type": "done"}
+
+    model_id overrides the default for this call only (e.g. Summit 2.0's
+    model-choice demo). Omitted/None preserves DEFCON's existing behavior
+    exactly — same env-var lookup as before.
     """
-    model_id = os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+    model_id = model_id or os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
     # Mutate the passed-in list directly so the caller accumulates conversation history.
     local_messages = messages
 

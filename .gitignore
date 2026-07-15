@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+tmp/
 .venv/
 .env
 medimind.db
@@ -11,3 +12,12 @@ verification/screenshots/
 *.egg-info/
 dist/
 .mypy_cache/
+.ruff_cache/
+
+# Internal planning docs / infra runbooks — reference company-internal
+# paths, ticket numbers, and sandbox AWS details; never meant to be public.
+TUNNEL.md
+DESCRIPTION.md
+specs/SUMMIT-02-strands-and-guardrail.md
+specs/SUMMIT-03-eonar-patterns-in-demo.md
+specs/SUMMIT-04-summit-2-0-unified-story.md
